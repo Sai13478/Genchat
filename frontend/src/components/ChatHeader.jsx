@@ -1,10 +1,18 @@
-import { X } from "lucide-react";
+import { X, PhoneCall } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
+import { useNavigate } from "react-router-dom";
 
 const ChatHeader = () => {
   const { selectedUser, setSelectedUser } = useChatStore();
   const { onlineUsers } = useAuthStore();
+  const navigate = useNavigate();
+
+  const handleCallClick = () => {
+    if (selectedUser?._id) {
+      navigate(`/call/${selectedUser._id}`);
+    }
+  };
 
   return (
     <div className="p-2.5 border-b border-base-300">
@@ -26,12 +34,25 @@ const ChatHeader = () => {
           </div>
         </div>
 
-        {/* Close button */}
-        <button onClick={() => setSelectedUser(null)}>
-          <X />
-        </button>
+        {/* Call & Close Buttons */}
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={handleCallClick}
+            className="p-2 rounded-full bg-green-500 text-white hover:bg-green-600 transition-colors"
+          >
+            <PhoneCall size={20} />
+          </button>
+
+          <button 
+            onClick={() => setSelectedUser(null)}
+            className="p-2 rounded-full hover:bg-gray-200 transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
       </div>
     </div>
   );
 };
+
 export default ChatHeader;
