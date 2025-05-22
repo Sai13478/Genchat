@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: my-fullstack-app
+    name: Genchat
     env: node
     buildCommand: |
       cd frontend && npm install && npm run build
