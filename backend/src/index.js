@@ -1,42 +1,36 @@
-// server.js or index.js
-
-import express from 'express';
 import dotenv from 'dotenv';
-import cookieParser from 'cookie-parser';
-import cors from 'cors';
 import path from 'path';
 import { connectDB } from './lib/db.js';
 import authRoutes from './routes/auth.route.js';
 import messageRoutes from './routes/message.route.js';
-import { app, server } from './lib/socket.js';
+import { app, startServer } from './lib/socket.js';
+import callRoutes from './routes/call.route.js';
+
+
 
 dotenv.config();
 
-const PORT = process.env.PORT || 3000;
 const __dirname = path.resolve();
 
-app.use(express.json({ limit: '10mb' }));
-app.use(cookieParser());
-app.use(
-  cors({
-    origin: 'http://localhost:5173',
-    credentials: true,
-  })
-);
-
-// Important: API route prefix '/api'
+// Mount API routes. The core middleware (cors, json, cookieParser) is already in socket.js
 app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);
 
+// Serve static files from the frontend build directory in production
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../frontend/dist')));
+  // Assuming this script is run from the `backend` directory
+  const frontendDistPath = path.resolve(__dirname, '..', 'frontend', 'dist');
+  app.use(express.static(frontendDistPath));
 
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend', 'dist', 'index.html'));
+    res.sendFile(path.resolve(frontendDistPath, 'index.html'));
   });
 }
-
-server.listen(PORT, () => {
-  console.log(`Server is running on PORT: ${PORT}`);
-  connectDB();
+app.use("/api/calls", callRoutes);
+// Start the server only after the database connection is established
+connectDB().then(() => {
+  startServer();
+}).catch(err => {
+  console.error('🔴 Failed to start server due to DB connection error:', err);
+  process.exit(1);
 });
