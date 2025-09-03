@@ -1,57 +1,85 @@
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
+import { useEffect, useCallback } from "react";
+import CallLogsPage from "./pages/CallLogsPage"; 
 import Navbar from "./components/Navbar";
 import HomePage from "./pages/HomePage";
 import SignUpPage from "./pages/SignUpPage";
 import LoginPage from "./pages/LoginPage";
-import SettingsPage from "./pages/SettingsPage";
-import ProfilePage from "./pages/ProfilePage";
 import CallPage from "./pages/CallPage";
+import IncomingCallModal from "./components/IncomingCallModal";
 
-import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/useAuthStore";
-import { useThemeStore } from "./store/useThemeStore";
-import { useEffect } from "react";
+import { useSocket } from "./context/SocketContext";
+import useCallStore from "./store/useCallStore";
 
-import { Loader } from "lucide-react";
-import { Toaster } from "react-hot-toast";
+function App() {
+	const { authUser, checkAuth } = useAuthStore();
+	const { socket } = useSocket();
+	const { setIncomingCallData, setCallState, resetCallState } = useCallStore();
+	const navigate = useNavigate();
 
-const App = () => {
-  const { authUser, checkAuth, isCheckingAuth, onlineUsers } = useAuthStore();
-  const { theme } = useThemeStore();
+	useEffect(() => {
+		checkAuth();
+	}, [checkAuth]);
 
-  console.log({ onlineUsers });
+	// Memoize event handlers to stabilize the useEffect dependency array
+	const handleIncomingCall = useCallback(
+		(data) => {
+			setIncomingCallData(data);
+			setCallState("ringing");
+		},
+		[setIncomingCallData, setCallState]
+	);
 
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+	const handleCallAccepted = useCallback(
+		async (data) => {
+			const { peerConnection } = useCallStore.getState();
+			if (peerConnection) {
+				await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+			}
+			setCallState("connected");
+		},
+		[setCallState]
+	);
 
-  console.log({ authUser });
+	const handleCallEnd = useCallback(() => {
+		resetCallState();
+		navigate("/");
+	}, [resetCallState, navigate]);
 
-  if (isCheckingAuth && !authUser)
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader className="size-10 animate-spin" />
-      </div>
-    );
+	useEffect(() => {
+		if (!socket) return;
 
-  return (
-    <div data-theme={theme}>
-      <Navbar />
+		socket.on("incoming-call", handleIncomingCall);
+		socket.on("call-accepted", handleCallAccepted);
+		socket.on("call-declined", handleCallEnd);
+		socket.on("hangup", handleCallEnd);
 
-      <Routes>
-        <Route path="/" element={authUser ? <HomePage /> : <Navigate to="/login" />} />
-        <Route path="/signup" element={!authUser ? <SignUpPage /> : <Navigate to="/" />} />
-        <Route path="/login" element={!authUser ? <LoginPage /> : <Navigate to="/" />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/profile" element={authUser ? <ProfilePage /> : <Navigate to="/login" />} />
-        <Route
-          path="/call/:receiverId"
-          element={authUser ? <CallPage authUser={authUser} /> : <Navigate to="/login" />}
-        />
-      </Routes>
+		return () => {
+			socket.off("incoming-call", handleIncomingCall);
+			socket.off("call-accepted", handleCallAccepted);
+			socket.off("call-declined", handleCallEnd);
+			socket.off("hangup", handleCallEnd);
+		};
+	}, [socket, handleIncomingCall, handleCallAccepted, handleCallEnd]);
 
-      <Toaster />
-    </div>
-  );
-};
+	return (
+		<div className='h-screen'>
+			<Navbar />
+			<div className='px-4 py-2.5 max-w-7xl mx-auto'>
+				<Routes>
+					<Route path='/' element={authUser ? <HomePage /> : <Navigate to={"/login"} />} />
+					<Route path='/signup' element={!authUser ? <SignUpPage /> : <Navigate to={"/"} />} />
+					<Route path='/login' element={!authUser ? <LoginPage /> : <Navigate to={"/"} />} />
+					<Route path='/call' element={authUser ? <CallPage /> : <Navigate to={"/login"} />} />
+					<Route path='/call-logs' element={authUser ? <CallLogsPage /> : <Navigate to={"/login"} />} />
+				</Routes>
+				<Toaster />
+				<IncomingCallModal />
+			</div>
+		</div>
+	);
+}
 
 export default App;

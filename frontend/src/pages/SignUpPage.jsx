@@ -10,28 +10,33 @@ const SignUpPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
+    username: "",
     email: "",
     password: "",
+    confirmPassword: "",
   });
 
   const { signup, isSigningUp } = useAuthStore();
 
-  const validateForm = () => {
-    if (!formData.fullName.trim()) return toast.error("Full name is required");
-    if (!formData.email.trim()) return toast.error("Email is required");
-    if (!/\S+@\S+\.\S+/.test(formData.email)) return toast.error("Invalid email format");
-    if (!formData.password) return toast.error("Password is required");
-    if (formData.password.length < 6) return toast.error("Password must be at least 6 characters");
-
-    return true;
+  const handleValidation = () => {
+    if (!formData.fullName.trim()) return "Full Name is required";
+    if (!formData.username.trim()) return "Username is required";
+    if (!formData.email.trim()) return "Email is required";
+    if (!/\S+@\S+\.\S+/.test(formData.email)) return "Invalid email format";
+    if (!formData.password) return "Password is required";
+    if (formData.password.length < 6) return "Password must be at least 6 characters";
+    if (formData.password !== formData.confirmPassword) return "Passwords do not match";
+    return null;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
-    const success = validateForm();
-
-    if (success === true) signup(formData);
+    const validationError = handleValidation();
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+    signup(formData);
   };
 
   return (
@@ -68,6 +73,24 @@ const SignUpPage = () => {
                   placeholder="John Doe"
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-medium">Username</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User className="size-5 text-base-content/40" />
+                </div>
+                <input
+                  type="text"
+                  className={`input input-bordered w-full pl-10`}
+                  placeholder="johndoe"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 />
               </div>
             </div>
@@ -116,6 +139,26 @@ const SignUpPage = () => {
                     <Eye className="size-5 text-base-content/40" />
                   )}
                 </button>
+              </div>
+            </div>
+
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-medium">Confirm Password</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="size-5 text-base-content/40" />
+                </div>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className={`input input-bordered w-full pl-10`}
+                  placeholder="••••••••"
+                  value={formData.confirmPassword}
+                  onChange={(e) =>
+                    setFormData({ ...formData, confirmPassword: e.target.value })
+                  }
+                />
               </div>
             </div>
 

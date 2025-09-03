@@ -51,35 +51,7 @@ const NoChatSelected = () => {
         <p className="text-base-content/60">
           Please choose a conversation from the sidebar to begin chatting.
         </p>
-
-        {/* Call Logs Section */}
-        <div className="mt-8">
-          <h3 className="text-xl font-semibold">Recent Call Logs</h3>
-          {callLogs.length === 0 ? (
-            <div className="mt-4 text-lg">No call logs available yet</div>
-          ) : (
-            callLogs.map((log, index) => (
-              <div
-                key={index}
-                className="flex justify-center items-center mt-4 bg-white p-4 rounded-lg shadow"
-              >
-                <img
-                  src={
-                    log.icon ||
-                    "https://example.com/your_whatsapp_icon_image.png"
-                  }
-                  alt="Call Icon"
-                  className="w-12 h-12 mr-2"
-                />
-                <span className="text-lg">
-                  {/* log.type could be 'Missed Call', 'Incoming', etc.
-                      log.timestamp (in milliseconds) is formatted as a readable time */}
-                  {log.type} at {new Date(log.timestamp).toLocaleTimeString()}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
+        
       </div>
     </div>
   );
