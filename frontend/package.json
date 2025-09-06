@@ -9,7 +9,6 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "vite preview --port $PORT"
-
   },
   "dependencies": {
     "@mui/icons-material": "^7.0.2",
