@@ -5,7 +5,7 @@ services:
     buildCommand: |
       cd frontend && npm install && npm run build
       cd ../backend && npm install
-    startCommand: node src/index.js
+    startCommand: node src/app.js
     rootDir: backend
     envVars:
       - key: NODE_ENV

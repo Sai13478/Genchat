@@ -1,85 +1,125 @@
+import { useEffect } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import { useEffect, useCallback } from "react";
-import CallLogsPage from "./pages/CallLogsPage"; 
+
+// Components and Pages
 import Navbar from "./components/Navbar";
 import HomePage from "./pages/HomePage";
 import SignUpPage from "./pages/SignUpPage";
 import LoginPage from "./pages/LoginPage";
 import CallPage from "./pages/CallPage";
+import CallLogsPage from "./pages/CallLogsPage";
+import ProfilePage from "./pages/ProfilePage";
+import SettingsPage from "./pages/SettingsPage";
+import CallFailedPage from "./pages/CallFailedPage";
 import IncomingCallModal from "./components/IncomingCallModal";
 
+// State and Context
+import { useThemeStore } from "./store/useThemeStore";
 import { useAuthStore } from "./store/useAuthStore";
 import { useSocket } from "./context/SocketContext";
-import useCallStore from "./store/useCallStore";
+import { useCallStore } from "./store/useCallStore";
 
 function App() {
-	const { authUser, checkAuth } = useAuthStore();
-	const { socket } = useSocket();
-	const { setIncomingCallData, setCallState, resetCallState } = useCallStore();
-	const navigate = useNavigate();
+    const { authUser, isCheckingAuth, checkAuth } = useAuthStore();
+    const { socket } = useSocket();
+    const { theme } = useThemeStore();
+    const navigate = useNavigate();
 
-	useEffect(() => {
-		checkAuth();
-	}, [checkAuth]);
+    // Destructure all necessary methods from the call store
+    const { setIncomingCallData, handleCallAccepted, handleNewIceCandidate, hangup } = useCallStore();
 
-	// Memoize event handlers to stabilize the useEffect dependency array
-	const handleIncomingCall = useCallback(
-		(data) => {
-			setIncomingCallData(data);
-			setCallState("ringing");
-		},
-		[setIncomingCallData, setCallState]
-	);
+    // Effect for checking authentication status on initial load
+    useEffect(() => {
+        checkAuth();
+    }, [checkAuth]);
 
-	const handleCallAccepted = useCallback(
-		async (data) => {
-			const { peerConnection } = useCallStore.getState();
-			if (peerConnection) {
-				await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-			}
-			setCallState("connected");
-		},
-		[setCallState]
-	);
+    // Effect for handling standard call signaling (incoming, offline, declined)
+    useEffect(() => {
+        if (!socket) return;
 
-	const handleCallEnd = useCallback(() => {
-		resetCallState();
-		navigate("/");
-	}, [resetCallState, navigate]);
+        const handleIncomingCall = (data) => {
+            setIncomingCallData(data);
+        };
 
-	useEffect(() => {
-		if (!socket) return;
+        const handleUserOffline = ({ userId }) => {
+            console.log(`Call failed: User ${userId} is offline.`);
+            navigate("/call-failed", { state: { reason: "The user you are trying to call is offline." } });
+        };
 
-		socket.on("incoming-call", handleIncomingCall);
-		socket.on("call-accepted", handleCallAccepted);
-		socket.on("call-declined", handleCallEnd);
-		socket.on("hangup", handleCallEnd);
+        const handleCallDeclined = () => {
+            navigate("/call-failed", { state: { reason: "The user declined your call." } });
+        };
 
-		return () => {
-			socket.off("incoming-call", handleIncomingCall);
-			socket.off("call-accepted", handleCallAccepted);
-			socket.off("call-declined", handleCallEnd);
-			socket.off("hangup", handleCallEnd);
-		};
-	}, [socket, handleIncomingCall, handleCallAccepted, handleCallEnd]);
+        socket.on("incoming-call", handleIncomingCall);
+        socket.on("user-offline", handleUserOffline);
+        socket.on("call-declined", handleCallDeclined);
 
-	return (
-		<div className='h-screen'>
-			<Navbar />
-			<div className='px-4 py-2.5 max-w-7xl mx-auto'>
-				<Routes>
-					<Route path='/' element={authUser ? <HomePage /> : <Navigate to={"/login"} />} />
-					<Route path='/signup' element={!authUser ? <SignUpPage /> : <Navigate to={"/"} />} />
-					<Route path='/login' element={!authUser ? <LoginPage /> : <Navigate to={"/"} />} />
-					<Route path='/call' element={authUser ? <CallPage /> : <Navigate to={"/login"} />} />
-					<Route path='/call-logs' element={authUser ? <CallLogsPage /> : <Navigate to={"/login"} />} />
-				</Routes>
-				<Toaster />
-				<IncomingCallModal />
-			</div>
-		</div>
-	);
+        return () => {
+            socket.off("incoming-call", handleIncomingCall);
+            socket.off("user-offline", handleUserOffline);
+            socket.off("call-declined", handleCallDeclined);
+        };
+    }, [socket, navigate, setIncomingCallData]);
+
+    // --- NEW: Effect for handling WebRTC specific signaling ---
+    useEffect(() => {
+        if (!socket) return;
+
+        // Listener for when the callee accepts the call
+        const onCallAccepted = ({ answer }) => {
+            handleCallAccepted(answer);
+        };
+
+        // Listener for receiving ICE candidates from the other peer
+        const onIceCandidate = ({ candidate }) => {
+            handleNewIceCandidate(candidate);
+        };
+
+        // Listener for when the other user hangs up
+        const onHangup = () => {
+            hangup(socket); // This will reset the call state and clean up connections
+        };
+
+        socket.on("call-accepted", onCallAccepted);
+        socket.on("ice-candidate", onIceCandidate);
+        socket.on("hangup", onHangup);
+
+        return () => {
+            socket.off("call-accepted", onCallAccepted);
+            socket.off("ice-candidate", onIceCandidate);
+            socket.off("hangup", onHangup);
+        };
+    }, [socket, handleCallAccepted, handleNewIceCandidate, hangup]);
+
+    // Loading screen while checking auth
+    if (isCheckingAuth) {
+        return (
+            <div className='h-screen flex justify-center items-center'>
+                <span className='loading loading-lg'></span>
+            </div>
+        );
+    }
+
+    return (
+        <div data-theme={theme}>
+            <Navbar />
+            <div className='h-screen flex items-center justify-center'>
+                <Routes>
+                    <Route path='/' element={authUser ? <HomePage /> : <Navigate to={"/login"} />} />
+                    <Route path='/signup' element={!authUser ? <SignUpPage /> : <Navigate to={"/"} />} />
+                    <Route path='/login' element={!authUser ? <LoginPage /> : <Navigate to={"/"} />} />
+                    <Route path='/call' element={authUser ? <CallPage /> : <Navigate to={"/login"} />} />
+                    <Route path='/call-logs' element={authUser ? <CallLogsPage /> : <Navigate to={"/login"} />} />
+                    <Route path='/profile' element={authUser ? <ProfilePage /> : <Navigate to={"/login"} />} />
+                    <Route path='/settings' element={authUser ? <SettingsPage /> : <Navigate to={"/login"} />} />
+                    <Route path='/call-failed' element={authUser ? <CallFailedPage /> : <Navigate to={"/login"} />} />
+                </Routes>
+                <Toaster />
+                <IncomingCallModal />
+            </div>
+        </div>
+    );
 }
 
 export default App;

@@ -4,49 +4,40 @@ import io from "socket.io-client";
 
 const SocketContext = createContext();
 
+// This custom hook provides an easy way to access the socket context.
 export const useSocket = () => {
-    return useContext(SocketContext);
+	return useContext(SocketContext);
 };
 
 export const SocketContextProvider = ({ children }) => {
-    const [socket, setSocket] = useState(null);
-    const [onlineUsers, setOnlineUsers] = useState([]);
-    const { authUser } = useAuthStore();
+	const [socket, setSocket] = useState(null);
+	const [onlineUsers, setOnlineUsers] = useState([]);
+	const { authUser } = useAuthStore();
 
-    useEffect(() => {
-        if (authUser) {
-            const newSocket = io(import.meta.env.VITE_API_URL, {
-                query: {
-                    userId: authUser._id,
-                },
-                // Use WebSockets first, and disable long-polling fallbacks if you want to ensure a pure WebSocket connection
-                transports: ["websocket"],
-            });
+	useEffect(() => {
+		if (authUser) {
+			const newSocket = io(import.meta.env.VITE_BACKEND_URL || "http://localhost:3000", {
+				query: {
+					userId: authUser._id,
+				},
+			});
 
-            setSocket(newSocket);
+			setSocket(newSocket);
 
-            newSocket.on("connect", () => {
-                console.log("✅ Socket connected successfully:", newSocket.id);
-            });
+			newSocket.on("getOnlineUsers", (users) => {
+				setOnlineUsers(users);
+			});
 
-            // Listen for online users update
-            newSocket.on("getOnlineUsers", (users) => {
-                setOnlineUsers(users);
-            });
+			// Clean up the socket connection when the component unmounts or authUser changes
+			return () => newSocket.close();
+		} else {
+			if (socket) {
+				socket.close();
+				setSocket(null);
+			}
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [authUser]);
 
-            // Cleanup function to close the socket when the component unmounts or user logs out
-            return () => {
-                console.log("🔌 Closing socket connection.");
-                newSocket.close();
-            };
-        } else {
-            // If there is no authenticated user, close any existing socket
-            if (socket) {
-                socket.close();
-                setSocket(null);
-            }
-        }
-    }, [authUser]);
-
-    return <SocketContext.Provider value={{ socket, onlineUsers }}>{children}</SocketContext.Provider>;
+	return <SocketContext.Provider value={{ socket, onlineUsers, setOnlineUsers }}>{children}</SocketContext.Provider>;
 };

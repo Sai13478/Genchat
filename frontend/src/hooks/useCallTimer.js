@@ -1,30 +1,32 @@
-import { useState, useEffect } from "react";
-import useCallStore from "../store/useCallStore";
+import { useState, useEffect } from 'react';
+import { useCallStore } from '../store/useCallStore';
 
 const useCallTimer = () => {
-	const { callStartTime } = useCallStore();
-	const [duration, setDuration] = useState(0);
+  const { callStartTime, callState } = useCallStore();
+  const [timer, setTimer] = useState('00:00');
 
-	useEffect(() => {
-		if (!callStartTime) {
-			setDuration(0);
-			return;
-		}
+  useEffect(() => {
+    if (callState !== 'connected' || !callStartTime) {
+      setTimer('00:00');
+      return;
+    }
 
-		const interval = setInterval(() => {
-			setDuration(Math.floor((Date.now() - callStartTime) / 1000));
-		}, 1000);
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const elapsedSeconds = Math.floor((now - callStartTime) / 1000);
+      
+      const minutes = Math.floor(elapsedSeconds / 60);
+      const seconds = elapsedSeconds % 60;
 
-		return () => clearInterval(interval);
-	}, [callStartTime]);
+      const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      setTimer(formattedTime);
+    }, 1000);
 
-	const formatTime = (totalSeconds) => {
-		const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
-		const seconds = (totalSeconds % 60).toString().padStart(2, "0");
-		return `${minutes}:${seconds}`;
-	};
+    // Cleanup the interval when the component unmounts or the call ends
+    return () => clearInterval(interval);
+  }, [callStartTime, callState]);
 
-	return formatTime(duration);
+  return timer;
 };
 
 export default useCallTimer;

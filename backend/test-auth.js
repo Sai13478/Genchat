@@ -21,23 +21,9 @@ const api = axios.create({
   },
 });
 
-// Use an interceptor to automatically handle the auth token
-api.interceptors.response.use(response => {
-  // If the response has a JWT cookie, save it for subsequent requests
-  const cookies = response.headers['set-cookie'];
-  const jwtCookie = cookies?.find(c => c.startsWith('jwt='));
-  if (jwtCookie) {
-    const authToken = jwtCookie.split(';')[0].split('=')[1];
-    console.log('🔑 JWT token saved from cookies and applied to future requests');
-    // Apply the token to all subsequent requests from this axios instance
-    api.defaults.headers.common['Cookie'] = `jwt=${authToken}`;
-    // Also common to send as a Bearer token
-    api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
-  }
-  return response;
-}, error => {
-  return Promise.reject(error);
-});
+// This variable will hold the cookie string from the login response
+let authTokenCookie = '';
+
 // Helper function to handle API errors
 function handleApiError(error, context) {
   console.error(`❌ Error ${context}:`, {
@@ -48,10 +34,14 @@ function handleApiError(error, context) {
   process.exit(1);
 }
 
+function logStep(message) {
+  console.log(`\n🔵 ${message}`);
+}
+
 // Test user signup
 async function testSignup() {
   try {
-    console.log('\n🔵 Testing signup...');
+    logStep('Testing signup...');
     const response = await api.post('/auth/signup', {
       fullName: 'Test User',
       username: `testuser_${Date.now()}`,
@@ -74,17 +64,28 @@ async function testSignup() {
 // Test login
 async function testLogin() {
   try {
-    console.log('\n🔵 Testing login...');
+    logStep('Testing login...');
     const response = await api.post('/auth/login', {
       email: TEST_EMAIL,
       password: TEST_PASSWORD,
     });
-    
+
+    // Explicitly check for the JWT cookie in the response headers
+    const cookies = response.headers['set-cookie'];
+    const jwtCookie = cookies?.find(c => c.startsWith('jwt='));
+
+    if (!jwtCookie) {
+      console.error('❌ Login succeeded but no JWT cookie was returned from the server.');
+      process.exit(1);
+    }
+
+    authTokenCookie = jwtCookie.split(';')[0]; // e.g., "jwt=ey..."
+    console.log(`🔑 Received JWT cookie: ${authTokenCookie}`);
+
     console.log('✅ Login successful:', {
       userId: response.data.user._id,
       email: response.data.user.email,
     });
-    
     return response.data.user;
   } catch (error) {
     handleApiError(error, 'during login');
@@ -94,8 +95,8 @@ async function testLogin() {
 // Test authentication check
 async function testAuthCheck() {
   try {
-    console.log('\n🔵 Testing auth check...');
-    
+    logStep('Testing auth check...');
+
     // Create a new instance without interceptors for the unauthenticated check
     const unauthenticatedApi = axios.create({ baseURL: API_URL });
 
@@ -113,9 +114,11 @@ async function testAuthCheck() {
       }
     }
     
-    // Now try with the main 'api' instance, which should have the token from the interceptor
-    const response = await api.get('/auth/check');
-    
+    // Now try with an authenticated request by manually adding the cookie
+    const response = await api.get('/auth/check', {
+      headers: { Cookie: authTokenCookie },
+    });
+
     console.log('✅ Authenticated check passed:', {
       userId: response.data._id,
       email: response.data.email,
@@ -130,14 +133,16 @@ async function testAuthCheck() {
 // Test profile update
 async function testProfileUpdate() {
   try {
-    console.log('\n🔵 Testing profile update...');
-    
+    logStep('Testing profile update...');
+
     // Create a simple base64 encoded image for testing
     const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
     
-    // The main 'api' instance will automatically have the auth headers
-    const response = await api.put('/auth/update-profile', { profilePic: testImage });
-    
+    // Send the request with the auth cookie
+    const response = await api.put('/auth/update-profile', { profilePic: testImage }, {
+      headers: { Cookie: authTokenCookie },
+    });
+
     console.log('✅ Profile update successful:', {
       profilePic: response.data.user.profilePic,
     });
@@ -151,17 +156,17 @@ async function testProfileUpdate() {
 // Run all tests
 async function runTests() {
   try {
-    console.log('🚀 Starting authentication flow tests...');
-    
+    console.log('🚀 Starting backend authentication flow tests...');
+
     // Test signup
     await testSignup();
-    
+
     // Test login
     await testLogin();
-    
+
     // Test auth check
     await testAuthCheck();
-    
+
     // Test profile update
     await testProfileUpdate();
     

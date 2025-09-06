@@ -1,6 +1,7 @@
 import { THEMES } from "../constants";
 import { useThemeStore } from "../store/useThemeStore";
-import { Send } from "lucide-react";
+import { Send, Fingerprint } from "lucide-react";
+import { useAuthStore } from "../store/useAuthStore";
 
 const PREVIEW_MESSAGES = [
   { id: 1, content: "Hey! How's it going?", isSent: false },
@@ -9,6 +10,7 @@ const PREVIEW_MESSAGES = [
 
 const SettingsPage = () => {
   const { theme, setTheme } = useThemeStore();
+  const { registerPasskey } = useAuthStore();
 
   return (
     <div className="h-screen container mx-auto px-4 pt-20 max-w-5xl">
@@ -41,6 +43,22 @@ const SettingsPage = () => {
               </span>
             </button>
           ))}
+        </div>
+
+        {/* Security Section */}
+        <div className="flex flex-col gap-1 pt-4">
+          <h2 className="text-lg font-semibold">Security</h2>
+          <p className="text-sm text-base-content/70">Manage your account security settings</p>
+        </div>
+
+        <div className="bg-base-200 rounded-lg p-4 flex items-center justify-between">
+          <div>
+            <h3 className="font-medium">Passkeys</h3>
+            <p className="text-sm text-base-content/60">Use your device to sign in securely without a password.</p>
+          </div>
+          <button className="btn btn-primary" onClick={registerPasskey}>
+            <Fingerprint className="size-4 mr-2" /> Add a Passkey
+          </button>
         </div>
 
         {/* Preview Section */}

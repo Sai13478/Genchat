@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import AuthImagePattern from "../components/AuthImagePattern";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare, Fingerprint } from "lucide-react";
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -10,7 +10,7 @@ const LoginPage = () => {
     email: "",
     password: "",
   });
-  const { login, isLoggingIn } = useAuthStore();
+  const { login, isLoggingIn, loginWithPasskey } = useAuthStore();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -51,6 +51,7 @@ const LoginPage = () => {
                   className={`input input-bordered w-full pl-10`}
                   placeholder="you@example.com"
                   value={formData.email}
+                  autoComplete="email"
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 />
               </div>
@@ -68,6 +69,7 @@ const LoginPage = () => {
                   type={showPassword ? "text" : "password"}
                   className={`input input-bordered w-full pl-10`}
                   placeholder="••••••••"
+                  autoComplete="current-password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 />
@@ -96,6 +98,13 @@ const LoginPage = () => {
               )}
             </button>
           </form>
+
+          <div className="divider">OR</div>
+
+          <button className="btn btn-outline w-full" onClick={loginWithPasskey} disabled={isLoggingIn}>
+            <Fingerprint className="size-5" />
+            Sign in with a Passkey
+          </button>
 
           <div className="text-center">
             <p className="text-base-content/60">
