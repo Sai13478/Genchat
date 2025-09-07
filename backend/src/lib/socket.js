@@ -17,7 +17,7 @@ const server = http.createServer(app);
 const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
-  "https://genchat-klywzxp8g-sai13478s-projects.vercel.app",
+  "https://genchat-rho.vercel.app/",
 ];
 
 if (process.env.FRONTEND_URLS) {
