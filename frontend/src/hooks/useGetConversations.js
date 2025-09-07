@@ -12,7 +12,6 @@ const useGetConversations = () => {
 		const getConversations = async () => {
 			setLoading(true);
 			try {
-				debugger
 				const res = await apiClient.get("/messages/conversations");
 				setConversations(res.data);
 			} catch (error) {
