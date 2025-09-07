@@ -21,7 +21,7 @@ const allowedOrigins = [
   '*',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
-  'https://l9vk18ms-5173.inc1.devtunnels.ms/',
+  'https://genchat-klywzxp8g-sai13478s-projects.vercel.app',
 ];
 
 if (process.env.FRONTEND_URLS) {
