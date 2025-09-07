@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-import { connectDB as connectToMongoDB } from "./lib/db.js";
+import { connectDB } from "./lib/db.js";
 import { server } from "./lib/socket.js";
 
 dotenv.config();
@@ -7,6 +7,6 @@ dotenv.config();
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
-	connectToMongoDB();
+	connectDB();
 	console.log(`🚀 Server running on port ${PORT}`);
 });
