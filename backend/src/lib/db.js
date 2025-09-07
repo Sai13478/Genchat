@@ -15,10 +15,10 @@ if (!cached) {
 }
 
 export const connectDB = async () => {
-  console.log('prnt env', process.env.MONGO_URI);
-  if (!process.env.MONGO_URI) {
-    throw new Error('MONGO_URI is not defined in environment variables');
-  }
+  const mongouri = "mongodb+srv://saipramodvedantam:cFsFJ37viwgHdMec@cluster0.rtwqnkw.mongodb.net/rc_a?retryWrites=true&w=majority&appName=Cluster0"
+  // if (!process.env.MONGO_URI ||mongouri) {
+  //   throw new Error('MONGO_URI is not defined in environment variables');
+  // }
 
   // If we have a cached connection in development, use it
   if (cached.conn) {
@@ -36,7 +36,7 @@ export const connectDB = async () => {
       };
 
       console.log('Connecting to MongoDB...');
-      cached.promise = mongoose.connect(process.env.MONGO_URI, opts)
+      cached.promise = mongoose.connect(mongouri, opts)
         .then((mongoose) => {
           console.log(`MongoDB connected: ${mongoose.connection.host}`);
           return mongoose;
