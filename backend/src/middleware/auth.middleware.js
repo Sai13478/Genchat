@@ -1,30 +1,32 @@
-import jwt from "jsonwebtoken";
-import User from "../models/user.model.js";
+const jwt = require("jsonwebtoken");
 
-export const protectRoute = async (req, res, next) => {
-	try {
-		const token = req.cookies.jwt;
-		if (!token) {
-			return res.status(401).json({ error: "Unauthorized - No Token Provided" });
-		}
+const authMiddleware = (req, res, next) => {
+  let token;
 
-		const decoded = jwt.verify(token, process.env.JWT_SECRET);
-		if (!decoded) {
-			return res.status(401).json({ error: "Unauthorized - Invalid Token" });
-		}
+  // 1. Check cookie
+  if (req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  }
 
-		const user = await User.findById(decoded.userId).select("-password");
-		if (!user) {
-			return res.status(404).json({ error: "User not found" });
-		}
+  // 2. Check Authorization header
+  if (!token && req.headers.authorization) {
+    const authHeader = req.headers.authorization;
+    if (authHeader.startsWith("Bearer ")) {
+      token = authHeader.split(" ")[1];
+    }
+  }
 
-		req.user = user;
-		next();
-	} catch (error) {
-		console.error("Error in protectRoute middleware: ", error.message);
-		if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
-			return res.status(401).json({ error: "Unauthorized - Invalid or Expired Token" });
-		}
-		res.status(500).json({ error: "Internal Server Error" });
-	}
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized - No Token Provided" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: "Unauthorized - Invalid Token" });
+  }
 };
+
+module.exports = authMiddleware;
