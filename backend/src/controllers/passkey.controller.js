@@ -10,8 +10,15 @@ import generateTokenAndSetCookie from "../utils/generateToken.js";
 
 // Relying Party (your application)
 const rpName = "GenChat";
-const rpID = process.env.NODE_ENV === "production" ? process.env.RP_ID : "localhost";
-const origin = process.env.NODE_ENV === "production" ? process.env.ORIGIN : "http://localhost:5173";
+const rpID =
+	process.env.NODE_ENV === "production"
+		? process.env.RP_ID
+		: "localhost";
+
+const origin =
+	process.env.NODE_ENV === "production"
+		? process.env.ORIGIN
+		: "http://localhost:5173";
 
 // In-memory store for challenges. In a real-world scenario, use a more robust
 // store like Redis or a temporary database collection.
