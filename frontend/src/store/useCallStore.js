@@ -1,332 +1,231 @@
 import { create } from "zustand";
 import toast from "react-hot-toast";
+import { playIncomingRingtone, playOutgoingRingtone, stopRingtone } from "../utils/callSounds.js";
 
 let peerConnection;
+let localStream;
 
 const configuration = {
-	iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 };
 
 export const useCallStore = create((set, get) => ({
-	incomingCallData: null,
-	callAccepted: false,
-	callStartTime: null,
-	localStream: null,
-	remoteStream: null,
-	callState: "idle", // 'idle', 'ringing', 'calling', 'connected', 'failed'
-	callType: null,
-	callee: null,
-	caller: null,
-	callId: null,
-	isScreenSharing: false,
-	isMuted: false,
-	isVideoEnabled: false,
-	// FIX 1: Added a queue to buffer ICE candidates that arrive too early.
-	iceCandidateQueue: [],
+    incomingCallData: null,
+    callAccepted: false,
+    callStartTime: null,
+    remoteStream: null,
+    callState: "idle", // 'idle', 'ringing', 'calling', 'connected', 'failed'
+    callType: null,
+    callee: null,
+    caller: null,
+    callId: null,
+    isMuted: false,
+    isVideoEnabled: true,
+    iceCandidateQueue: [],
 
-	_createPeerConnection: (socket) => {
-		if (peerConnection) {
-			console.log("Closing old peer connection.");
-			peerConnection.close();
-		}
-		// Reset the ICE candidate queue for the new connection.
-		set({ iceCandidateQueue: [] });
-		peerConnection = new RTCPeerConnection(configuration);
-		console.log("Created new peer connection.");
+    // --- Helpers ---
+    _getMediaStream: async (type) => {
+        try {
+            const videoConstraints = type === "video" ? {
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                frameRate: { ideal: 30 },
+            } : false;
 
-		// Log state changes for debugging
-		peerConnection.onsignalingstatechange = () => {
-			if (peerConnection) {
-				console.log(`Signaling state change: ${peerConnection.signalingState}`);
-			}
-		};
-		peerConnection.onconnectionstatechange = () => {
-			if (peerConnection) {
-				console.log(`Connection state change: ${peerConnection.connectionState}`);
-			}
-		};
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: videoConstraints,
+                audio: true,
+            });
+            localStream = stream;
+            set({ isVideoEnabled: type === "video" });
+            return stream;
+        } catch (error) {
+            console.error("Error getting media stream:", error);
+            toast.error("Camera/Mic access denied. Please check permissions.");
+            return null;
+        }
+    },
 
-		const { localStream } = get();
-		if (localStream) {
-			localStream.getTracks().forEach((track) => {
-				peerConnection.addTrack(track, localStream);
-			});
-		}
+    _createPeerConnection: (socket) => {
+        if (peerConnection) {
+            peerConnection.close();
+        }
+        peerConnection = new RTCPeerConnection(configuration);
 
-		peerConnection.ontrack = (event) => {
-			console.log("Received remote stream");
-			set({ remoteStream: event.streams[0] });
-		};
+        if (localStream) {
+            localStream.getTracks().forEach((track) => {
+                peerConnection.addTrack(track, localStream);
+            });
+        }
 
-		peerConnection.onicecandidate = (event) => {
-			if (event.candidate) {
-				const { callee, caller } = get();
-				const otherUser = get().callState === "calling" ? callee : caller;
-				if (otherUser) {
-					socket.emit("ice-candidate", {
-						to: otherUser._id,
-						candidate: event.candidate,
-					});
-				}
-			}
-		};
-	},
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                const { callee, caller, callState } = get();
+                const otherUser = callState === "calling" ? callee : caller;
+                if (otherUser) {
+                    socket.emit("ice-candidate", {
+                        to: otherUser._id,
+                        candidate: event.candidate,
+                        callId: get().callId,
+                    });
+                }
+            }
+        };
 
-	setIncomingCallData: (callDetails) =>
-		set({
-			incomingCallData: callDetails,
-			callState: "ringing",
-			callType: callDetails.callType,
-			caller: callDetails.from,
-			callId: callDetails.callId,
-		}),
+        peerConnection.ontrack = (event) => {
+            set({ remoteStream: event.streams[0] });
+        };
 
-	initiateCall: async (callee, socket, callType) => {
-		set({ callState: "calling", callee, callType, isVideoEnabled: callType === "video" });
-		get()._createPeerConnection(socket);
+        peerConnection.onconnectionstatechange = () => {
+            if (peerConnection) {
+                if (peerConnection.connectionState === "connected") {
+                    set({ callState: "connected", callAccepted: true, callStartTime: Date.now() });
+                }
+                if (["failed", "disconnected"].includes(peerConnection.connectionState)) {
+                    get().hangup(socket);
+                }
+            }
+        };
+    },
 
-		try {
-			const offer = await peerConnection.createOffer();
-			await peerConnection.setLocalDescription(offer);
+    // --- Public Actions ---
+    setIncomingCallData: (callDetails) => {
+        playIncomingRingtone();
+        set({
+            incomingCallData: callDetails,
+            callState: "ringing",
+            callType: callDetails.callType,
+            caller: callDetails.from,
+            callId: callDetails.callId,
+        });
+    },
 
-			socket.emit("call-user", {
-				to: callee._id,
-				offer: offer,
-				callType: callType,
-			});
-		} catch (error) {
-			console.error("Error creating offer:", error);
-			get().setCallFailed();
-		}
-	},
+    initiateCall: async (callee, socket, callType) => {
+        const stream = await get()._getMediaStream(callType);
+        if (!stream) return;
 
-	answerCall: async (socket) => {
-		const { incomingCallData } = get();
-		if (!incomingCallData) return;
+        playOutgoingRingtone();
+        set({ callState: "calling", callee, callType });
+        get()._createPeerConnection(socket);
 
-		const { callType } = incomingCallData;
+        try {
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            socket.emit("call-user", { to: callee._id, offer, callType });
+        } catch (error) {
+            console.error("Error creating offer:", error);
+            get().hangup(socket);
+        }
+    },
 
-		try {
-			const videoConstraints = {
-				width: { ideal: 1280 },
-				height: { ideal: 720 },
-				frameRate: { ideal: 30 },
-			};
-			const stream = await navigator.mediaDevices.getUserMedia({
-				video: callType === "video" ? videoConstraints : false,
-				audio: true,
-			});
+    answerCall: async (socket) => {
+        stopRingtone();
+        const { incomingCallData } = get();
+        if (!incomingCallData) return;
 
-			set({
-				localStream: stream,
-				isVideoEnabled: callType === "video",
-				incomingCallData: null,
-				callState: "connected",
-				callAccepted: true,
-				callStartTime: Date.now(),
-			});
+        const stream = await get()._getMediaStream(incomingCallData.callType);
+        if (!stream) return get().declineCall(socket);
 
-			get()._createPeerConnection(socket);
+        set({ incomingCallData: null });
+        get()._createPeerConnection(socket);
 
-			await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingCallData.offer));
+        try {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingCallData.offer));
+            get().iceCandidateQueue.forEach((c) => peerConnection.addIceCandidate(new RTCIceCandidate(c)));
+            set({ iceCandidateQueue: [] });
 
-			// FIX 1: Process any buffered ICE candidates now that remote description is set.
-			get().iceCandidateQueue.forEach((candidate) => {
-				peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-			});
-			set({ iceCandidateQueue: [] });
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            socket.emit("answer-call", { to: incomingCallData.from._id, answer, callId: incomingCallData.callId });
+        } catch (error) {
+            console.error("Error answering call:", error);
+            get().hangup(socket);
+        }
+    },
 
-			const answer = await peerConnection.createAnswer();
-			await peerConnection.setLocalDescription(answer);
+    handleCallAccepted: async (answer) => {
+        stopRingtone();
+        if (!peerConnection || peerConnection.signalingState !== "have-local-offer") return;
+        try {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            get().iceCandidateQueue.forEach((c) => peerConnection.addIceCandidate(new RTCIceCandidate(c)));
+            set({ iceCandidateQueue: [] });
+        } catch (error) {
+            console.error("Error setting remote description:", error);
+        }
+    },
 
-			socket.emit("answer-call", { to: incomingCallData.from._id, answer, callId: incomingCallData.callId });
-		} catch (error) {
-			console.error("Error answering call:", error);
-			toast.error("Could not answer call. Please allow camera and microphone access.");
-			get().declineCall(socket);
-		}
-	},
+    handleNewIceCandidate: async (candidate) => {
+        if (peerConnection && candidate) {
+            try {
+                if (!peerConnection.remoteDescription) {
+                    set((state) => ({ iceCandidateQueue: [...state.iceCandidateQueue, candidate] }));
+                } else {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                }
+            } catch (error) {
+                console.error("Error adding ICE candidate:", error);
+            }
+        }
+    },
 
-	handleCallAccepted: async (answer) => {
-		if (!peerConnection) {
-			console.error("handleCallAccepted: peerConnection is not initialized!");
-			return;
-		}
+    declineCall: (socket) => {
+        stopRingtone();
+        const { incomingCallData } = get();
+        if (incomingCallData) {
+            socket.emit("decline-call", { to: incomingCallData.from._id, callId: incomingCallData.callId });
+        }
+        get()._cleanup();
+    },
 
-		// FIX 2: Add a guard clause to prevent setting an answer in an invalid state.
-		if (peerConnection.signalingState !== "have-local-offer") {
-			console.warn(`handleCallAccepted called in wrong state: ${peerConnection.signalingState}. Ignoring.`);
-			return;
-		}
+    hangup: (socket) => {
+        stopRingtone();
+        const { callee, caller, callId } = get();
+        const otherUser = callee || caller;
+        if (otherUser) {
+            socket.emit("hangup", { to: otherUser._id, callId });
+        }
+        get()._cleanup();
+    },
 
-		try {
-			await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+    _cleanup: () => {
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
+        if (localStream) {
+            localStream.getTracks().forEach((t) => t.stop());
+            localStream = null;
+        }
+        set({
+            incomingCallData: null,
+            callAccepted: false,
+            callStartTime: null,
+            remoteStream: null,
+            callState: "idle",
+            callType: null,
+            callee: null,
+            caller: null,
+            callId: null,
+            iceCandidateQueue: [],
+            isMuted: false,
+            isVideoEnabled: true,
+        });
+    },
 
-			// FIX 1: Process any buffered ICE candidates now that remote description is set.
-			get().iceCandidateQueue.forEach((candidate) => {
-				peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-			});
-			set({ iceCandidateQueue: [] });
+    toggleMute: () => {
+        const { isMuted } = get();
+        if (localStream) {
+            localStream.getAudioTracks().forEach((t) => (t.enabled = isMuted));
+            set({ isMuted: !isMuted });
+        }
+    },
 
-			set({ callState: "connected", callAccepted: true, callStartTime: Date.now() });
-		} catch (error) {
-			console.error("Error setting remote description:", error);
-		}
-	},
-
-	handleNewIceCandidate: async (candidate) => {
-		if (peerConnection && candidate) {
-			try {
-				// FIX 1: If the remote description isn't set yet, queue the candidate. Otherwise, add it directly.
-				if (peerConnection.remoteDescription) {
-					await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-				} else {
-					set((state) => ({ iceCandidateQueue: [...state.iceCandidateQueue, candidate] }));
-				}
-			} catch (error) {
-				console.error("Error adding/queuing received ICE candidate", error);
-			}
-		}
-	},
-
-	declineCall: (socket) => {
-		const { incomingCallData } = get();
-		if (incomingCallData) {
-			socket.emit("decline-call", { to: incomingCallData.from._id, callId: incomingCallData.callId });
-		}
-		get().hangup(socket, false);
-	},
-
-	hangup: (socket, shouldEmit = true) => {
-		if (shouldEmit) {
-			const { callee, caller, callId } = get();
-			const otherUser = callee || caller;
-			if (otherUser) {
-				socket.emit("hangup", { to: otherUser._id, callId });
-			}
-		}
-
-		if (peerConnection) {
-			peerConnection.close();
-			peerConnection = null;
-			console.log("Peer connection closed and cleaned up.");
-		}
-
-		get().resetCallState();
-	},
-
-	resetCallState: () => {
-		const { localStream, remoteStream } = get();
-		if (localStream) localStream.getTracks().forEach((track) => track.stop());
-		if (remoteStream) remoteStream.getTracks().forEach((track) => track.stop());
-
-		set({
-			incomingCallData: null,
-			callAccepted: false,
-			callStartTime: null,
-			localStream: null,
-			remoteStream: null,
-			callState: "idle",
-			callType: null,
-			callee: null,
-			caller: null,
-			callId: null,
-			isScreenSharing: false,
-			isMuted: false,
-			isVideoEnabled: false,
-			iceCandidateQueue: [],
-		});
-	},
-
-	setLocalStream: (stream) => set({ localStream: stream }),
-	setRemoteStream: (stream) => set({ remoteStream: stream }),
-	setCallId: (callId) => set({ callId }),
-
-	toggleMute: () => {
-		const { localStream, isMuted } = get();
-		if (localStream) {
-			const newMutedState = !isMuted;
-			localStream.getAudioTracks().forEach((track) => {
-				track.enabled = !newMutedState;
-			});
-			set({ isMuted: newMutedState });
-		}
-	},
-
-	toggleVideo: () => {
-		const { localStream, isVideoEnabled } = get();
-		if (localStream) {
-			const newVideoState = !isVideoEnabled;
-			localStream.getVideoTracks().forEach((track) => {
-				track.enabled = newVideoState;
-			});
-			set({ isVideoEnabled: newVideoState });
-		}
-	},
-
-	toggleScreenShare: async () => {
-		const { isScreenSharing, localStream, callType } = get();
-
-		if (callType !== "video" || !peerConnection) {
-			console.warn("Screen sharing is only available for video calls and when a peer connection is active.");
-			return;
-		}
-
-		if (isScreenSharing) {
-			try {
-				const videoConstraints = {
-					width: { ideal: 1280 },
-					height: { ideal: 720 },
-					frameRate: { ideal: 30 },
-				};
-
-				const cameraStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
-				const cameraTrack = cameraStream.getVideoTracks()[0];
-
-				const sender = peerConnection.getSenders().find((s) => s.track?.kind === "video");
-				if (sender) {
-					await sender.replaceTrack(cameraTrack);
-				}
-
-				localStream.getVideoTracks().forEach((track) => track.stop());
-
-				const newStream = new MediaStream([cameraTrack, ...localStream.getAudioTracks()]);
-				set({ localStream: newStream, isScreenSharing: false });
-			} catch (error) {
-				console.error("Error switching back to camera:", error);
-				toast.error("Could not switch back to camera. Please check permissions.");
-			}
-		} else {
-			try {
-				const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-				const screenTrack = screenStream.getVideoTracks()[0];
-
-				const sender = peerConnection.getSenders().find((s) => s.track?.kind === "video");
-				if (sender) {
-					await sender.replaceTrack(screenTrack);
-				}
-
-				screenTrack.onended = () => {
-					if (get().isScreenSharing) get().toggleScreenShare();
-				};
-
-				localStream.getVideoTracks().forEach((track) => track.stop());
-
-				const newStream = new MediaStream([screenTrack, ...localStream.getAudioTracks()]);
-				set({ localStream: newStream, isScreenSharing: true });
-			} catch (error) {
-				console.error("Error starting screen share:", error);
-				if (error.name !== "NotAllowedError" && error.name !== "NotFoundError") {
-					toast.error("Could not start screen sharing.");
-				}
-			}
-		}
-	},
-
-	setCallFailed: (reason = "Call Failed") => {
-		set({ callState: "failed" });
-		setTimeout(() => {
-			get().resetCallState();
-		}, 2000);
-	},
+    toggleVideo: () => {
+        const { isVideoEnabled } = get();
+        if (localStream) {
+            localStream.getVideoTracks().forEach((t) => (t.enabled = !isVideoEnabled));
+            set({ isVideoEnabled: !isVideoEnabled });
+        }
+    },
 }));
