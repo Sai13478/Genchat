@@ -12,22 +12,24 @@ dotenv.config();
 
 const app = express();
 
+// Body parser & cookie parser
 app.use(express.json({ limit: "50mb" }));
 app.use(cookieParser());
 
-// Read allowed frontends from env
+// ---------- CORS CONFIG ----------
 const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "https://genchat-rho.vercel.app",
+  "https://genchat-b23lbalkm-sai13478s-projects.vercel.app",
 ];
 
 if (process.env.FRONTEND_URLS) {
-  const frontendUrls = process.env.FRONTEND_URLS.split(",").map(url => url.trim());
-  allowedOrigins.push(...frontendUrls);
+  const urls = process.env.FRONTEND_URLS.split(",").map((url) => url.trim());
+  allowedOrigins.push(...urls);
 }
 
-const validOrigins = [...new Set(allowedOrigins.filter(Boolean))];
-console.log("Allowed CORS origins:", validOrigins);
+const validOrigins = [...new Set(allowedOrigins)];
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -38,26 +40,23 @@ const corsOptions = {
       callback(new Error("Not allowed by CORS"));
     }
   },
-  credentials: true,
+  credentials: true, // <-- important for cookies
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "cache-control", "pragma"],
 };
 
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+app.options("*", cors(corsOptions)); // Handle preflight requests
 
-// API Routes
+// ---------- API ROUTES ----------
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/v1/users/call-logs", callLogRoutes);
 app.use("/api/passkeys", passkeyRoutes);
 
-// Health check
+// ---------- HEALTH CHECK ----------
 app.get("/health", (req, res) => {
-  res.status(200).json({
-    status: "OK",
-    timestamp: new Date().toISOString(),
-  });
+  res.status(200).json({ status: "OK", timestamp: new Date().toISOString() });
 });
 
 export default app;

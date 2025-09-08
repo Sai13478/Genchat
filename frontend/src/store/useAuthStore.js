@@ -7,8 +7,7 @@ export const useAuthStore = create((set, get) => ({
   authUser: null,
   isSigningUp: false,
   isLoggingIn: false,
-  isUpdatingProfile: false,
-  isCheckingAuth: true, // Loader on app startup
+  isCheckingAuth: true,
 
   checkAuth: async () => {
     set({ isCheckingAuth: true });
@@ -16,11 +15,10 @@ export const useAuthStore = create((set, get) => ({
       const res = await apiClient.get("/auth/check");
       set({ authUser: res.data });
     } catch (error) {
-      // Handle 401 gracefully
       if (error.response?.status === 401) {
-        console.info("User is not logged in (expected).");
+        console.info("User not logged in (expected).");
       } else {
-        console.error("Auth check error:", error.response?.data?.error || error.message);
+        console.error("checkAuth error:", error.response?.data?.error || error.message);
       }
       set({ authUser: null });
     } finally {
@@ -64,36 +62,16 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  updateProfile: async (data) => {
-    set({ isUpdatingProfile: true });
-    try {
-      const res = await apiClient.put("/auth/update-profile", data);
-      set({ authUser: res.data.user });
-      toast.success("Profile updated successfully");
-    } catch (error) {
-      console.error("Update profile error:", error);
-      toast.error(error?.response?.data?.error || "Profile update failed");
-    } finally {
-      set({ isUpdatingProfile: false });
-    }
-  },
-
   registerPasskey: async () => {
     try {
       const options = await apiClient.get("/passkeys/register-options");
-
-      // Ensure options.data is JSON (sometimes Axios wraps it)
       const attestation = await startRegistration(options.data);
-
       await apiClient.post("/passkeys/verify-registration", attestation);
-
-      toast.success("Passkey registered successfully!");
+      toast.success("Passkey registered!");
       get().checkAuth();
     } catch (error) {
       console.error("Passkey registration error:", error);
-      const message =
-        error.response?.data?.error || error.message || "Passkey registration failed.";
-      toast.error(message);
+      toast.error(error?.response?.data?.error || "Passkey registration failed.");
     }
   },
 
@@ -102,15 +80,12 @@ export const useAuthStore = create((set, get) => ({
     try {
       const options = await apiClient.get("/passkeys/login-options");
       const assertion = await startAuthentication(options.data);
-
       const res = await apiClient.post("/passkeys/verify-login", assertion);
       set({ authUser: res.data });
-      toast.success("Logged in successfully with passkey!");
+      toast.success("Logged in with passkey!");
     } catch (error) {
       console.error("Passkey login error:", error);
-      const message =
-        error.response?.data?.error || error.message || "Passkey login failed.";
-      toast.error(message);
+      toast.error(error?.response?.data?.error || "Passkey login failed.");
     } finally {
       set({ isLoggingIn: false });
     }
