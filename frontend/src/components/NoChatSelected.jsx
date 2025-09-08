@@ -2,29 +2,18 @@ import React, { useState, useEffect } from "react";
 import io from "socket.io-client";
 import { MessageSquare } from "lucide-react";
 
-// Initialize the socket connection (update the URL as needed)
 const socket = io();
 
 const NoChatSelected = () => {
-  // State to store call logs fetched from the server
   const [callLogs, setCallLogs] = useState([]);
 
   useEffect(() => {
-    // Emit an event to request existing call logs from your backend
     socket.emit("fetchCallLogs");
+    socket.on("callLogs", (logs) => setCallLogs(logs));
+    socket.on("newCallLog", (log) =>
+      setCallLogs((prevLogs) => [log, ...prevLogs])
+    );
 
-    // Listen for the server's response with the call logs
-    socket.on("callLogs", (logs) => {
-      setCallLogs(logs);
-    });
-
-    // Listen for new call log events in real time
-    socket.on("newCallLog", (log) => {
-      // Prepend the new log to show the latest at the top
-      setCallLogs((prevLogs) => [log, ...prevLogs]);
-    });
-
-    // Cleanup event listeners when the component unmounts
     return () => {
       socket.off("callLogs");
       socket.off("newCallLog");
@@ -32,26 +21,23 @@ const NoChatSelected = () => {
   }, []);
 
   return (
-    <div className="w-full flex flex-1 flex-col items-center justify-center p-16 bg-base-100/50">
-      <div className="max-w-md text-center space-y-6">
+    <div className="flex flex-1 items-center justify-center w-full px-4 sm:px-8 lg:px-16 bg-base-100/50">
+      <div className="w-full max-w-lg text-center space-y-6">
         {/* Icon Display */}
-        <div className="flex justify-center gap-4 mb-4">
-          <div className="relative">
-            <div
-              className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center
-             justify-center animate-bounce"
-            >
-              <MessageSquare className="w-8 h-8 text-primary" />
-            </div>
+        <div className="flex justify-center mb-6">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-primary/10 flex items-center justify-center animate-bounce shadow-lg">
+            <MessageSquare className="w-10 h-10 sm:w-12 sm:h-12 text-primary" />
           </div>
         </div>
 
         {/* Welcome Text */}
-        <h2 className="text-2xl font-bold">Welcome to Genchat</h2>
-        <p className="text-base-content/60">
-          Please choose a conversation from the sidebar to begin chatting.
+        <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-base-content">
+          Welcome to <span className="text-primary">Genchat</span>
+        </h2>
+        <p className="text-sm sm:text-base text-base-content/70 leading-relaxed max-w-md mx-auto">
+          Please choose a conversation from the sidebar to begin chatting. Stay
+          connected and start meaningful conversations anytime.
         </p>
-        
       </div>
     </div>
   );
