@@ -61,11 +61,12 @@ export const verifyRegistration = async (req, res) => {
       const { credentialPublicKey, credentialID, counter } = verification.registrationInfo;
 
       const newAuthenticator = {
-        publicKey: Buffer.from(credentialPublicKey),
-        credentialID: Buffer.from(credentialID),
-        counter,
-        transports: req.body.response.transports || [],
-      };
+  publicKey: Buffer.from(credentialPublicKey).toString("base64"),
+  credentialID: Buffer.from(credentialID).toString("base64"),
+  counter,
+  transports: req.body.response.transports || [],
+};
+
 
       user.authenticators.push(newAuthenticator);
       user.currentChallenge = undefined;
@@ -103,7 +104,10 @@ export const verifyLogin = async (req, res) => {
     const response = req.body;
     const credentialID = base64url.toBuffer(response.id);
 
-    const user = await User.findOne({ "authenticators.credentialID": credentialID });
+const user = await User.findOne({
+  "authenticators.credentialID": credentialID.toString("base64"),
+});
+
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const authenticator = user.authenticators.find((auth) =>
@@ -113,13 +117,7 @@ export const verifyLogin = async (req, res) => {
 
     const verification = await verifyAuthenticationResponse({
       response,
-      expectedChallenge: (challenge) => {
-        if (loginChallenges.has(challenge)) {
-          loginChallenges.delete(challenge);
-          return true;
-        }
-        return false;
-      },
+      expectedChallenge: response.response.clientDataJSON.challenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
       authenticator,
