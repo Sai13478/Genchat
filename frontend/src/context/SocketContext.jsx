@@ -16,7 +16,7 @@ export const SocketContextProvider = ({ children }) => {
 
 	useEffect(() => {
 		if (authUser) {
-			const newSocket = io("https://genchat-vi93.onrender.com/api" || "http://localhost:3000", {
+			const newSocket = io("https://genchat-vi93.onrender.com/api" || "https://localhost:3000",{
 				query: {
 					userId: authUser._id,
 				},
