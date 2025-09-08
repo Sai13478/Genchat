@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Base URL is taken from Vite env variable
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL + "/api",
+  baseURL: "https://genchat-vi93.onrender.com/api",
   withCredentials: true, // Important to send cookies cross-origin
   headers: {
     "Content-Type": "application/json",
