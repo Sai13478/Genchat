@@ -1,22 +1,30 @@
 import axios from "axios";
 
-// Base URL is taken from Vite env variable
+const isProduction = import.meta.env.MODE === 'production' || process.env.NODE_ENV === 'production';
+
+const API_URL_PROD = "https://genchat-vi93.onrender.com/api";
+const API_URL_DEV = "http://localhost:3000/api"; // Your local backend URL
+
+const baseURL = isProduction ? API_URL_PROD : API_URL_DEV;
+
+console.log(`API is running in ${isProduction ? 'production' : 'development'} mode. Base URL: ${baseURL}`);
+
 const apiClient = axios.create({
-  baseURL: "https://genchat-vi93.onrender.com/api",
-  withCredentials: true, // Important to send cookies cross-origin
+  baseURL: baseURL,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Optional: Interceptors to handle 401 errors globally
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => response, 
   (error) => {
     if (error.response && error.response.status === 401) {
-      console.warn("Unauthorized! User is not logged in.");
-      // Optional: redirect to login page or show a toast
+      console.error("API Error: 401 Unauthorized. The user's token is likely invalid or expired.");
+     
     }
+    
     return Promise.reject(error);
   }
 );
