@@ -1,62 +1,183 @@
 import http from "http";
 import { Server } from "socket.io";
-import app from "../app.js"; // Assuming app.js exports your express app
+import dotenv from "dotenv";
+import app from "../app.js";
+import User from "../models/user.model.js";
+import Message from "../models/message.model.js";
+import CallLog from "../models/callLog.model.js";
 
-// --- HTTP + IO Server Setup ---
+dotenv.config();
+
 const server = http.createServer(app);
 
-// --- CORS Configuration for Socket.IO ---
 const allowedOrigins = [
-  "http://localhost:5173", // Your local frontend dev port
-  "https://genchat-rho.vercel.app", // Your deployed Vercel URL
+  '*',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'https://genchat-rho.vercel.app', // Your production Vercel URL
 ];
+
+if (process.env.FRONTEND_URLS) {
+  const frontendUrls = process.env.FRONTEND_URLS.split(',').map(url => url.trim());
+  allowedOrigins.push(...frontendUrls);
+}
+
+const validOrigins = [...new Set(allowedOrigins.filter(Boolean))];
 
 const io = new Server(server, {
   cors: {
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like Postman) or from our allowed list
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
+    origin: validOrigins,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true,
   },
+  allowEIO3: true,
 });
 
-// --- Online Users Map ---
-const userSocketMap = new Map(); // { userId: socketId }
+// Store online users: { userId: Set<socketId> } to handle multiple connections
+const userSocketMap = new Map();
+
+const getReceiverSocketIds = (userId) => userSocketMap.get(userId) || new Set();
+
+const emitCallLogUpdate = async (logId) => {
+  try {
+    const populatedLog = await CallLog.findById(logId)
+      .populate("caller", "fullName profilePic _id")
+      .populate("callee", "fullName profilePic _id")
+      .lean();
+
+    if (!populatedLog) return;
+
+    const callerId = populatedLog.caller._id.toString();
+    const calleeId = populatedLog.callee._id.toString();
+
+    const logForCaller = { ...populatedLog, receiverId: populatedLog.callee };
+    io.to(callerId).emit("newCallLog", logForCaller);
+
+    const logForCallee = { ...populatedLog, receiverId: populatedLog.caller };
+    io.to(calleeId).emit("newCallLog", logForCallee);
+  } catch (error) {
+    console.error("Error emitting call log update:", error);
+  }
+};
 
 io.on("connection", (socket) => {
-  const userId = socket.handshake.query.userId;
-  if (userId && userId !== "undefined") {
-    console.log(`✅ User connected: ${userId} with socket ID: ${socket.id}`);
-    userSocketMap.set(userId, socket.id);
-
-    // Emit the list of online user IDs to all clients
-    io.emit("getOnlineUsers", Array.from(userSocketMap.keys()));
+  const userId = socket.handshake.query.userId?.toString();
+  if (!userId) {
+    console.warn("⚠️ Connection attempt without userId. Socket:", socket.id);
+    return;
   }
 
+  console.log(`✅ User connected: ${userId}, Socket: ${socket.id}`);
+
+  socket.join(userId);
+
+  if (!userSocketMap.has(userId)) {
+    userSocketMap.set(userId, new Set());
+  }
+  userSocketMap.get(userId).add(socket.id);
+
+  io.emit("getOnlineUsers", Array.from(userSocketMap.keys()));
+
   socket.on("disconnect", () => {
-    // Find which user disconnected
-    let disconnectedUserId;
-    for (let [id, socketId] of userSocketMap.entries()) {
-      if (socketId === socket.id) {
-        disconnectedUserId = id;
-        break;
+    console.log(`❌ User disconnected: ${userId}, Socket: ${socket.id}`);
+    const userSockets = userSocketMap.get(userId);
+    if (userSockets) {
+      userSockets.delete(socket.id);
+      if (userSockets.size === 0) {
+        userSocketMap.delete(userId);
       }
     }
+    io.emit("getOnlineUsers", Array.from(userSocketMap.keys()));
+  });
 
-    if (disconnectedUserId) {
-        console.log(`❌ User disconnected: ${disconnectedUserId}`);
-        userSocketMap.delete(disconnectedUserId);
-        // Emit the updated list of online users
-        io.emit("getOnlineUsers", Array.from(userSocketMap.keys()));
+  // --- Call Signaling Lifecycle ---
+
+  socket.on("call-user", async ({ to, offer, callType }) => {
+    if (userSocketMap.has(to)) {
+      try {
+        console.log(`[${new Date().toISOString()}] Relaying call from ${userId} to ${to}`);
+        const callerUser = await User.findById(userId).select("fullName profilePic _id");
+
+        const newLog = new CallLog({ caller: userId, callee: to, callType, status: 'missed' });
+        await newLog.save();
+
+        const callId = newLog._id.toString();
+        io.to(to).emit("incoming-call", { from: callerUser, offer, callId, callType });
+        emitCallLogUpdate(callId);
+      } catch (error) {
+        console.error("Error creating call log:", error.message);
+        socket.emit("call-failed", { message: "Could not initiate call.", reason: error.message });
+      }
+    } else {
+      console.log(`[${new Date().toISOString()}] User ${to} is offline, notifying caller ${userId}`);
+      socket.emit("user-offline", { userId: to });
     }
   });
 
-  // ... (rest of your event handlers for calls, messages, etc.)
+  socket.on("answer-call", ({ to, answer, callId }) => {
+    console.log(`[${new Date().toISOString()}] Relaying answer for ${callId} from ${userId} to ${to}`);
+    io.to(to).emit("call-accepted", { from: userId, answer, callId });
+  });
+
+  socket.on("decline-call", async ({ to, callId }) => {
+    console.log(`[${new Date().toISOString()}] Relaying decline for ${callId} from ${userId} to ${to}`);
+    try {
+      await CallLog.findByIdAndUpdate(callId, { status: "declined" });
+      emitCallLogUpdate(callId);
+    } catch (error) {
+      console.error("Error updating call log to declined:", error);
+    }
+    io.to(to).emit("call-declined", { from: userId, callId });
+  });
+
+  socket.on("hangup", async ({ to, callId }) => {
+    try {
+      const call = await CallLog.findById(callId);
+      if (call && call.status === "missed") {
+        const duration = Math.floor((Date.now() - new Date(call.createdAt).getTime()) / 1000);
+        await CallLog.findByIdAndUpdate(callId, { status: "answered", duration });
+        emitCallLogUpdate(callId);
+      }
+    } catch (error) {
+      console.error("Error updating call log on hangup:", error);
+    }
+    console.log(`[${new Date().toISOString()}] Relaying hangup for ${callId} from ${userId} to ${to}`);
+    io.to(to).emit("hangup", { from: userId, callId });
+  });
+
+  socket.on("ice-candidate", ({ to, candidate, callId }) => {
+    io.to(to).emit("ice-candidate", { from: userId, candidate, callId });
+  });
+
+  // --- Chat Features ---
+
+  socket.on("newMessage", (message) => {
+    const receiverId = message.receiverId;
+    // Emit to the receiver's room, which will send to all their connected sockets
+    io.to(receiverId).emit("newMessage", message);
+  });
+
+  socket.on("typing", ({ to }) => {
+    io.to(to).emit("typing", { from: userId });
+  });
+
+  socket.on("stop-typing", ({ to }) => {
+    io.to(to).emit("stop-typing", { from: userId });
+  });
+
+  socket.on("markMessagesAsSeen", async ({ conversationId, userIdOfSender }) => {
+    try {
+      await Message.updateMany(
+        { conversationId: conversationId, seen: false, senderId: userIdOfSender },
+        { $set: { seen: true } }
+      );
+      io.to(userIdOfSender).emit("messagesSeen", { conversationId });
+    } catch (error) {
+      console.error("Error marking messages as seen:", error);
+    }
+  });
+
 });
 
-export { server, io, userSocketMap };
+export { server, io, getReceiverSocketIds };
+
