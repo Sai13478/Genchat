@@ -4,11 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "npx vite",
+    "build": "npx vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "start": "vite preview --port $PORT"
+    "preview": "npx vite preview",
+    "start": "npx vite preview --port $PORT"
   },
   "dependencies": {
     "@mui/icons-material": "^7.0.2",
