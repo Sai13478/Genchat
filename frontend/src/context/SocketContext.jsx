@@ -18,10 +18,14 @@ export const SocketContextProvider = ({ children }) => {
 		if (authUser) {
 			// In dev: connect to same origin (Vite proxy handles /socket.io)
 			// In prod: connect to VITE_BACKEND_URL
-			const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://genchat-vi93.onrender.com";
+			let backendUrl = import.meta.env.VITE_BACKEND_URL;
 
-			if (!import.meta.env.VITE_BACKEND_URL && import.meta.env.PROD) {
-				console.warn("VITE_BACKEND_URL is not defined. Falling back to hardcoded Render URL.");
+			// Sanity check: Avoid strings like "undefined" or empty strings
+			if (!backendUrl || backendUrl === "undefined" || !backendUrl.startsWith("http")) {
+				backendUrl = "https://genchat-vi93.onrender.com";
+				if (import.meta.env.PROD) {
+					console.warn("VITE_BACKEND_URL is invalid or missing. Falling back to hardcoded Render URL.");
+				}
 			}
 
 			const newSocket = io(backendUrl, {
@@ -29,6 +33,7 @@ export const SocketContextProvider = ({ children }) => {
 					userId: authUser._id,
 				},
 				transports: ['websocket', 'polling'], // Prioritize websocket
+				withCredentials: true, // Ensure cookies are sent for auth
 			});
 
 			setSocket(newSocket);
