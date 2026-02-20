@@ -36,23 +36,30 @@ const CallPage = () => {
     useEffect(() => {
         if (localStream && localVideoRef.current) {
             localVideoRef.current.srcObject = localStream;
+            localVideoRef.current.play().catch((err) => {
+                if (err.name !== "AbortError") console.error("Local video play error:", err);
+            });
         }
     }, [localStream]);
 
     useEffect(() => {
+        let isMounted = true;
         if (remoteStream && remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remoteStream;
-            // Force play if needed
-            remoteVideoRef.current.play().catch(console.error);
+            remoteVideoRef.current.play().catch((err) => {
+                if (err.name !== "AbortError") console.error("Remote video play error:", err);
+            });
         }
+        return () => { isMounted = false; };
     }, [remoteStream]);
 
     // Play remote audio for audio-only calls
     useEffect(() => {
         if (remoteStream && remoteAudioRef.current) {
             remoteAudioRef.current.srcObject = remoteStream;
-            // Force play if needed
-            remoteAudioRef.current.play().catch(console.error);
+            remoteAudioRef.current.play().catch((err) => {
+                if (err.name !== "AbortError") console.error("Remote audio play error:", err);
+            });
         }
     }, [remoteStream]);
 

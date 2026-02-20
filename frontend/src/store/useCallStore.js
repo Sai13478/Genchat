@@ -95,14 +95,17 @@ export const useCallStore = create((set, get) => ({
             console.log("Received remote track:", event.track.kind);
 
             set((state) => {
+                // Get the current stream or create a new one
                 const currentStream = state.remoteStream || new MediaStream();
-                // Avoid adding the same track multiple times
+
+                // Only add the track if it's not already there
                 if (!currentStream.getTracks().find(t => t.id === event.track.id)) {
                     currentStream.addTrack(event.track);
-                    // Return a NEW MediaStream object to trigger React reactivity
-                    return { remoteStream: new MediaStream(currentStream.getTracks()) };
                 }
-                return {};
+
+                // IMPORTANT: We must return a NEW MediaStream instance to trigger React state updates
+                // but we use the tracks from the current accumulated stream.
+                return { remoteStream: new MediaStream(currentStream.getTracks()) };
             });
         };
 
