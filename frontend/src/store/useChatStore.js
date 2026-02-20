@@ -9,7 +9,7 @@ export const useChatStore = create((set, get) => ({
   isTyping: false,
 
   getMessages: async (userId) => {
-    set({ isMessagesLoading: true });
+    set({ isMessagesLoading: true, messages: [] });
     try {
       const res = await apiClient.get(`/messages/${userId}`);
       set({ messages: res.data });
@@ -34,7 +34,7 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  setSelectedUser: (selectedUser) => set({ selectedUser }),
+  setSelectedUser: (selectedUser) => set({ selectedUser, messages: [] }),
   setMessages: (messages) => set({ messages }),
   setTyping: (isTyping) => set({ isTyping }),
   // This setter will be used by our real-time listener hook

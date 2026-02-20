@@ -4,7 +4,24 @@ import toast from "react-hot-toast";
 let peerConnection;
 
 const configuration = {
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun3.l.google.com:19302" },
+        { urls: "stun:stun4.l.google.com:19302" },
+        {
+            urls: "turn:openrelay.metered.ca:80",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+        },
+        {
+            urls: "turn:openrelay.metered.ca:443",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+        },
+    ],
+    iceCandidatePoolSize: 10,
 };
 
 export const useCallStore = create((set, get) => ({
@@ -49,19 +66,49 @@ export const useCallStore = create((set, get) => ({
             });
         }
 
+        peerConnection.onnegotiationneeded = async () => {
+            try {
+                console.log("Negotiation needed.");
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                const { callee, caller, callId } = get();
+                const otherUser = get().callState === "calling" ? callee : caller;
+                if (otherUser) {
+                    socket.emit("renegotiate-call", {
+                        to: otherUser._id,
+                        offer: offer,
+                        callId
+                    });
+                }
+            } catch (err) {
+                console.error("Error during negotiation:", err);
+            }
+        };
+
         peerConnection.ontrack = (event) => {
-            console.log("Received remote stream");
-            set({ remoteStream: event.streams[0] });
+            console.log("Received remote track:", event.track.kind);
+
+            set((state) => {
+                const currentStream = state.remoteStream || new MediaStream();
+                // Avoid adding the same track multiple times
+                if (!currentStream.getTracks().find(t => t.id === event.track.id)) {
+                    currentStream.addTrack(event.track);
+                    // Return a NEW MediaStream object to trigger React reactivity
+                    return { remoteStream: new MediaStream(currentStream.getTracks()) };
+                }
+                return {};
+            });
         };
 
         peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
-                const { callee, caller } = get();
+                const { callee, caller, callId } = get();
                 const otherUser = get().callState === "calling" ? callee : caller;
                 if (otherUser) {
                     socket.emit("ice-candidate", {
                         to: otherUser._id,
                         candidate: event.candidate,
+                        callId
                     });
                 }
             }
@@ -150,6 +197,22 @@ export const useCallStore = create((set, get) => ({
             set({ callState: "connected", callAccepted: true, callStartTime: Date.now() });
         } catch (error) {
             console.error("Error setting remote description:", error);
+        }
+    },
+
+    handleRenegotiation: async (offer, socket) => {
+        if (!peerConnection) return;
+        try {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            const { callee, caller, callId } = get();
+            const otherUser = callee || caller;
+            if (otherUser) {
+                socket.emit("answer-call", { to: otherUser._id, answer, callId });
+            }
+        } catch (error) {
+            console.error("Error during renegotiation response:", error);
         }
     },
 

@@ -13,7 +13,6 @@ const server = http.createServer(app);
 const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
-  'https://l9vk18ms-5173.inc1.devtunnels.ms/',
 ];
 
 if (process.env.FRONTEND_URLS) {
@@ -149,6 +148,12 @@ io.on("connection", (socket) => {
     }
     console.log(`[${new Date().toISOString()}] Relaying hangup for ${callId} from ${userId} to ${to}`);
     io.to(to).emit("hangup", { from: userId, callId });
+  });
+
+  // Renegotiate: Handle track updates (like screen share) during an active call
+  socket.on("renegotiate-call", ({ to, offer, callId }) => {
+    console.log(`[${new Date().toISOString()}] Relaying re-negotiation for ${callId} from ${userId} to ${to}`);
+    io.to(to).emit("renegotiate-call", { from: userId, offer, callId });
   });
 
   // ICE Candidate: Relay ICE candidates between peers

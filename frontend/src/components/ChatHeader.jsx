@@ -1,4 +1,4 @@
-import { Phone, Video } from "lucide-react";
+import { ArrowLeft, Phone, Video } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useSocket } from "../context/SocketContext";
 import { useCallStore } from "../store/useCallStore";
@@ -6,9 +6,9 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 const ChatHeader = () => {
-    const { selectedUser, isTyping } = useChatStore();
+    const { selectedUser, isTyping, setSelectedUser } = useChatStore();
     const { onlineUsers } = useSocket();
-    const { initiateCall, setLocalStream } = useCallStore(); // Get setLocalStream
+    const { initiateCall, setLocalStream } = useCallStore();
     const { socket } = useSocket();
     const navigate = useNavigate();
 
@@ -20,21 +20,18 @@ const ChatHeader = () => {
 
     const handleCall = async (callType) => {
         try {
-            // Define ideal video constraints for better quality
             const videoConstraints = {
                 width: { ideal: 1280 },
                 height: { ideal: 720 },
                 frameRate: { ideal: 30 },
             };
 
-            // 1. Get media stream BEFORE initiating the call
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: callType === "video" ? videoConstraints : false,
                 audio: true,
             });
-            setLocalStream(stream); // 2. Save stream to the store
+            setLocalStream(stream);
 
-            // 3. Now initiate the call
             initiateCall(selectedUser, socket, callType);
             navigate("/call");
         } catch (error) {
@@ -46,6 +43,13 @@ const ChatHeader = () => {
     return (
         <div className='flex items-center justify-between p-4 border-b bg-base-200'>
             <div className='flex items-center gap-3'>
+                {/* Back button - visible only on mobile */}
+                <button
+                    className='md:hidden btn btn-ghost btn-sm btn-circle'
+                    onClick={() => setSelectedUser(null)}
+                >
+                    <ArrowLeft className='size-5' />
+                </button>
                 <div className={`avatar ${isOnline ? "online" : "offline"}`}>
                     <div className='w-12 rounded-full'>
                         <img src={selectedUser.profilePic || "/avatar.png"} alt='user avatar' />

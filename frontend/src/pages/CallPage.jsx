@@ -25,6 +25,7 @@ const CallPage = () => {
     const timer = useCallTimer();
     const localVideoRef = useRef();
     const remoteVideoRef = useRef();
+    const remoteAudioRef = useRef();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -36,6 +37,13 @@ const CallPage = () => {
     useEffect(() => {
         if (remoteStream && remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remoteStream;
+        }
+    }, [remoteStream]);
+
+    // Play remote audio for audio-only calls
+    useEffect(() => {
+        if (remoteStream && remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = remoteStream;
         }
     }, [remoteStream]);
 
@@ -51,6 +59,9 @@ const CallPage = () => {
 
     return (
         <div className='relative w-screen h-screen bg-gray-900 flex items-center justify-center'>
+            {/* Hidden audio element to play remote stream for audio calls */}
+            <audio ref={remoteAudioRef} autoPlay playsInline />
+
             {/* Remote Stream */}
             {callType === "video" && remoteStream ? (
                 <video ref={remoteVideoRef} autoPlay playsInline className='w-full h-full object-cover' />

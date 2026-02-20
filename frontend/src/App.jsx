@@ -27,7 +27,7 @@ function App() {
     const navigate = useNavigate();
 
     // Destructure all necessary methods from the call store
-    const { setIncomingCallData, handleCallAccepted, handleNewIceCandidate, hangup } = useCallStore();
+    const { setIncomingCallData, handleCallAccepted, handleNewIceCandidate, hangup, handleRenegotiation } = useCallStore();
 
     // Effect for checking authentication status on initial load
     useEffect(() => {
@@ -71,6 +71,11 @@ function App() {
             handleCallAccepted(answer);
         };
 
+        // Listener for re-negotiation (e.g. screen share)
+        const onRenegotiateCall = ({ offer }) => {
+            handleRenegotiation(offer, socket);
+        };
+
         // Listener for receiving ICE candidates from the other peer
         const onIceCandidate = ({ candidate }) => {
             handleNewIceCandidate(candidate);
@@ -82,15 +87,17 @@ function App() {
         };
 
         socket.on("call-accepted", onCallAccepted);
+        socket.on("renegotiate-call", onRenegotiateCall);
         socket.on("ice-candidate", onIceCandidate);
         socket.on("hangup", onHangup);
 
         return () => {
             socket.off("call-accepted", onCallAccepted);
+            socket.off("renegotiate-call", onRenegotiateCall);
             socket.off("ice-candidate", onIceCandidate);
             socket.off("hangup", onHangup);
         };
-    }, [socket, handleCallAccepted, handleNewIceCandidate, hangup]);
+    }, [socket, handleCallAccepted, handleNewIceCandidate, hangup, handleRenegotiation]);
 
     // Loading screen while checking auth
     if (isCheckingAuth) {
