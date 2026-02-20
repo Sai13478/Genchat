@@ -8,6 +8,8 @@ const NoChatSelected = () => {
   const [callLogs, setCallLogs] = useState([]);
 
   useEffect(() => {
+    if (!socket) return;
+
     // Emit an event to request existing call logs from your backend
     socket.emit("fetchCallLogs");
 
@@ -27,7 +29,7 @@ const NoChatSelected = () => {
       socket.off("callLogs");
       socket.off("newCallLog");
     };
-  }, []);
+  }, [socket]);
 
   return (
     <div className="w-full flex flex-1 flex-col items-center justify-center p-16 bg-base-100/50">
