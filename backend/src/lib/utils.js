@@ -17,15 +17,14 @@ export const generateToken = (userId, res) => {
   const cookieOptions = {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: true, // Always secure for modern browsers/cross-site
+    sameSite: 'none', // Required for cross-site cookies (different devices/origins)
     path: '/',
-    domain: process.env.NODE_ENV === 'production' ? '.yourdomain.com' : undefined
   };
 
   // Set the cookie
   res.cookie('jwt', token, cookieOptions);
-  
+
   // Also set the token in the response header for API clients
   res.setHeader('Authorization', `Bearer ${token}`);
 
