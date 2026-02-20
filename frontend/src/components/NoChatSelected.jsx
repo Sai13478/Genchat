@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from "react";
-import io from "socket.io-client";
+import { useSocket } from "../context/SocketContext";
 import { MessageSquare } from "lucide-react";
 
-// Initialize the socket connection (update the URL as needed)
-const socket = io();
-
 const NoChatSelected = () => {
+  const { socket } = useSocket();
   // State to store call logs fetched from the server
   const [callLogs, setCallLogs] = useState([]);
 
@@ -51,7 +49,7 @@ const NoChatSelected = () => {
         <p className="text-base-content/60">
           Please choose a conversation from the sidebar to begin chatting.
         </p>
-        
+
       </div>
     </div>
   );
