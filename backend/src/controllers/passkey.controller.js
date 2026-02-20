@@ -6,12 +6,18 @@ import {
 	verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
 import base64url from "base64url";
-import generateTokenAndSetCookie from "../utils/generateToken.js";
+import { generateToken } from "../lib/utils.js";
 
 // Relying Party (your application)
 const rpName = "GenChat";
-const rpID = process.env.NODE_ENV === "production" ? process.env.RP_ID : "localhost";
-const origin = process.env.NODE_ENV === "production" ? process.env.ORIGIN : "http://localhost:5173";
+// Use host from request if RP_ID is not set
+const getRpID = (req) => process.env.RP_ID || req.get('host').split(':')[0];
+const getOrigin = (req) => {
+	if (process.env.NODE_ENV === "production" && process.env.ORIGIN) return process.env.ORIGIN;
+	const protocol = req.protocol;
+	const host = req.get('host');
+	return `${protocol}://${host}`;
+};
 
 // In-memory store for challenges. In a real-world scenario, use a more robust
 // store like Redis or a temporary database collection.
@@ -24,7 +30,7 @@ export const getRegistrationOptions = async (req, res) => {
 
 		const options = await generateRegistrationOptions({
 			rpName,
-			rpID,
+			rpID: getRpID(req),
 			userID: Buffer.from(user._id.toString(), "utf-8"),
 			userName: user.username || user.email, // Fallback to email if username is missing
 			userDisplayName: user.fullName,
@@ -54,8 +60,8 @@ export const verifyRegistration = async (req, res) => {
 		const verification = await verifyRegistrationResponse({
 			response: req.body,
 			expectedChallenge: user.currentChallenge,
-			expectedOrigin: origin,
-			expectedRPID: rpID,
+			expectedOrigin: getOrigin(req),
+			expectedRPID: getRpID(req),
 		});
 
 		if (verification.verified && verification.registrationInfo) {
@@ -85,7 +91,7 @@ export const verifyRegistration = async (req, res) => {
 export const getLoginOptions = async (req, res) => {
 	try {
 		const options = await generateAuthenticationOptions({
-			rpID,
+			rpID: getRpID(req),
 			allowCredentials: [], // Allow any registered passkey
 		});
 
@@ -129,8 +135,8 @@ export const verifyLogin = async (req, res) => {
 				}
 				return false;
 			},
-			expectedOrigin: origin,
-			expectedRPID: rpID,
+			expectedOrigin: getOrigin(req),
+			expectedRPID: getRpID(req),
 			authenticator: {
 				// Pass the authenticator properties to the verifier
 				credentialID: authenticator.credentialID,
@@ -146,7 +152,7 @@ export const verifyLogin = async (req, res) => {
 			await user.save();
 
 			// Generate token and log the user in
-			generateTokenAndSetCookie(user._id, res);
+			generateToken(user._id, res);
 
 			res.status(200).json({
 				_id: user._id,
