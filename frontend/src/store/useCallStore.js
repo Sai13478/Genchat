@@ -2,6 +2,7 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 
 let peerConnection;
+let makingOffer = false;
 
 const configuration = {
     iceServers: [
@@ -59,29 +60,34 @@ export const useCallStore = create((set, get) => ({
             }
         };
 
-        const { localStream } = get();
-        if (localStream) {
-            localStream.getTracks().forEach((track) => {
-                peerConnection.addTrack(track, localStream);
-            });
-        }
-
         peerConnection.onnegotiationneeded = async () => {
             try {
+                if (makingOffer || peerConnection.signalingState !== "stable") return;
+                makingOffer = true;
                 console.log("Negotiation needed.");
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
-                const { callee, caller, callId } = get();
-                const otherUser = get().callState === "calling" ? callee : caller;
+                const { callee, caller, callId, callState, callType } = get();
+                const otherUser = callState === "calling" ? callee : caller;
                 if (otherUser) {
-                    socket.emit("renegotiate-call", {
-                        to: otherUser._id,
-                        offer: offer,
-                        callId
-                    });
+                    if (callState === "calling") {
+                        socket.emit("call-user", {
+                            to: otherUser._id,
+                            offer: offer,
+                            callType: callType,
+                        });
+                    } else {
+                        socket.emit("renegotiate-call", {
+                            to: otherUser._id,
+                            offer: offer,
+                            callId
+                        });
+                    }
                 }
             } catch (err) {
                 console.error("Error during negotiation:", err);
+            } finally {
+                makingOffer = false;
             }
         };
 
@@ -128,18 +134,12 @@ export const useCallStore = create((set, get) => ({
         set({ callState: "calling", callee, callType, isVideoEnabled: callType === "video" });
         get()._createPeerConnection(socket);
 
-        try {
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-
-            socket.emit("call-user", {
-                to: callee._id,
-                offer: offer,
-                callType: callType,
+        // Add tracks after setting up the peer connection to trigger onnegotiationneeded
+        const { localStream } = get();
+        if (localStream) {
+            localStream.getTracks().forEach((track) => {
+                peerConnection.addTrack(track, localStream);
             });
-        } catch (error) {
-            console.error("Error creating offer:", error);
-            get().setCallFailed();
         }
     },
 
@@ -175,6 +175,14 @@ export const useCallStore = create((set, get) => ({
             get()._createPeerConnection(socket);
 
             await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingCallData.offer));
+
+            // Add local tracks after setting remote description
+            if (stream) {
+                stream.getTracks().forEach((track) => {
+                    peerConnection.addTrack(track, stream);
+                });
+            }
+
             const answer = await peerConnection.createAnswer();
             await peerConnection.setLocalDescription(answer);
 
