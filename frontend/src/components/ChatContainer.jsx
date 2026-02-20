@@ -17,7 +17,7 @@ const ChatContainer = () => {
   const messageEndRef = useRef(null);
 
   // This custom hook now handles all real-time message listening.
-  useListenMessages();
+  // useListenMessages is now called globally in App.jsx to handle notifications
   useListenTyping();
 
   useEffect(() => {

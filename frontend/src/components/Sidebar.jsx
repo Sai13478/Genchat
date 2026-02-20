@@ -2,16 +2,20 @@ import { useState } from "react";
 import { LogOut, Search } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useSocket } from "../context/SocketContext";
-import useGetConversations from "../hooks/useGetConversations";
+import { useChatStore } from "../store/useChatStore";
 import Conversation from "./Conversation";
 
 const Sidebar = () => {
     const { authUser, logout } = useAuthStore();
     const { onlineUsers } = useSocket();
-    const { conversations, loading } = useGetConversations();
+    const { users, getUsers, isUsersLoading } = useChatStore();
     const [searchQuery, setSearchQuery] = useState("");
 
-    const filteredConversations = conversations.filter((c) =>
+    useState(() => {
+        getUsers();
+    }, [getUsers]);
+
+    const filteredConversations = users.filter((c) =>
         c.fullName.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -40,11 +44,11 @@ const Sidebar = () => {
             <div className='divider px-3' />
 
             <div className='flex-1 overflow-auto'>
-                {loading && <p>Loading conversations...</p>}
-                {!loading && filteredConversations.length === 0 && searchQuery && (
+                {isUsersLoading && <p>Loading conversations...</p>}
+                {!isUsersLoading && filteredConversations.length === 0 && searchQuery && (
                     <p className='text-center text-gray-400 text-sm mt-4'>No conversations found</p>
                 )}
-                {!loading &&
+                {!isUsersLoading &&
                     filteredConversations.map((conversation) => (
                         <Conversation
                             key={conversation._id}

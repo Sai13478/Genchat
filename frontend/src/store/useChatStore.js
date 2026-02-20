@@ -1,12 +1,26 @@
 import { create } from "zustand";
 import toast from "react-hot-toast";
-import apiClient from "../lib/apiClient"; // <-- Import the correct, centralized client
+import apiClient from "../lib/apiClient";
 
 export const useChatStore = create((set, get) => ({
-  messages: [],
+  users: [],
   selectedUser: null,
+  messages: [],
+  isUsersLoading: false,
   isMessagesLoading: false,
   isTyping: false,
+
+  getUsers: async () => {
+    set({ isUsersLoading: true });
+    try {
+      const res = await apiClient.get("/messages/conversations");
+      set({ users: res.data });
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to load users");
+    } finally {
+      set({ isUsersLoading: false });
+    }
+  },
 
   getMessages: async (userId) => {
     set({ isMessagesLoading: true, messages: [] });
@@ -15,20 +29,23 @@ export const useChatStore = create((set, get) => ({
       set({ messages: res.data });
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to load messages");
-      set({ messages: [] }); // Ensure messages is an array on error
+      set({ messages: [] });
     } finally {
       set({ isMessagesLoading: false });
     }
   },
 
   sendMessage: async (messageData) => {
-    const { selectedUser, messages } = get();
+    const { selectedUser, messages, users } = get();
     if (!selectedUser) return toast.error("No user selected");
 
     try {
       const res = await apiClient.post(`/messages/send/${selectedUser._id}`, messageData);
-      // Optimistically update the UI for the sender.
       set({ messages: [...messages, res.data] });
+
+      // Move messaged user to top
+      const updatedUsers = users.filter((u) => u._id !== selectedUser._id);
+      set({ users: [selectedUser, ...updatedUsers] });
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to send message");
     }
@@ -36,7 +53,6 @@ export const useChatStore = create((set, get) => ({
 
   setSelectedUser: (selectedUser) => set({ selectedUser, messages: [] }),
   setMessages: (messages) => set({ messages }),
+  setUsers: (users) => set({ users }),
   setTyping: (isTyping) => set({ isTyping }),
-  // This setter will be used by our real-time listener hook
-
 }));

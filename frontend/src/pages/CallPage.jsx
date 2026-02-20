@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useCallStore } from '../store/useCallStore';
 import { PhoneOff, ScreenShare, ScreenShareOff, Mic, MicOff, Video, VideoOff } from "lucide-react";
 import useCallTimer from "../hooks/useCallTimer";
+import useStreamVolume from "../hooks/useStreamVolume";
 
 const CallPage = () => {
     const {
@@ -23,10 +24,14 @@ const CallPage = () => {
     } = useCallStore();
     const { socket } = useSocket();
     const timer = useCallTimer();
+    const remoteVolume = useStreamVolume(remoteStream);
     const localVideoRef = useRef();
     const remoteVideoRef = useRef();
     const remoteAudioRef = useRef();
     const navigate = useNavigate();
+
+    // Visual feedback for speech: turns ring green if volume > 10
+    const isSpeaking = remoteVolume > 10;
 
     useEffect(() => {
         if (localStream && localVideoRef.current) {
@@ -37,6 +42,8 @@ const CallPage = () => {
     useEffect(() => {
         if (remoteStream && remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remoteStream;
+            // Force play if needed
+            remoteVideoRef.current.play().catch(console.error);
         }
     }, [remoteStream]);
 
@@ -44,6 +51,8 @@ const CallPage = () => {
     useEffect(() => {
         if (remoteStream && remoteAudioRef.current) {
             remoteAudioRef.current.srcObject = remoteStream;
+            // Force play if needed
+            remoteAudioRef.current.play().catch(console.error);
         }
     }, [remoteStream]);
 
@@ -68,7 +77,7 @@ const CallPage = () => {
             ) : (
                 <div className='flex flex-col items-center gap-4'>
                     <div className='avatar'>
-                        <div className='w-40 rounded-full ring ring-primary ring-offset-base-100 ring-offset-4'>
+                        <div className={`w-40 rounded-full ring ring-offset-base-100 ring-offset-4 transition-all duration-300 ${isSpeaking ? "ring-success ring-offset-8" : "ring-primary"}`}>
                             <img src={callee?.profilePic || caller?.profilePic || "/avatar.png"} />
                         </div>
                     </div>

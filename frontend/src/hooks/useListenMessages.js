@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useSocket } from "../context/SocketContext";
 import { useChatStore } from "../store/useChatStore";
+import { useAuthStore } from "../store/useAuthStore";
 
 // Request notification permission once
 const requestNotificationPermission = () => {
@@ -11,7 +12,8 @@ const requestNotificationPermission = () => {
 
 const useListenMessages = () => {
 	const { socket } = useSocket();
-	const { messages, setMessages, selectedUser } = useChatStore();
+	const { setMessages, selectedUser } = useChatStore();
+	const { authUser } = useAuthStore();
 
 	// Request permission on mount
 	useEffect(() => {
@@ -22,19 +24,34 @@ const useListenMessages = () => {
 		if (!socket) return;
 
 		const handleNewMessage = (newMessage) => {
-			setMessages([...messages, newMessage]);
+			const { selectedUser, setMessages, users, setUsers } = useChatStore.getState();
 
-			// Show browser notification if tab is not focused
-			// and the message is not from the currently open chat
-			if (document.hidden || selectedUser?._id !== newMessage.senderId) {
-				showNotification(newMessage);
+			// 1. Only update the selectedUser's message list if the sender matches
+			if (selectedUser?._id === newMessage.senderId) {
+				const currentMessages = useChatStore.getState().messages;
+				setMessages([...currentMessages, newMessage]);
+			}
+
+			// 2. Move the sender to the top of the user list for recency
+			const sender = users.find(u => u._id === newMessage.senderId);
+			if (sender) {
+				const updatedUsers = users.filter(u => u._id !== newMessage.senderId);
+				setUsers([sender, ...updatedUsers]);
+			}
+
+			// 3. Show notification if NOT from the active user (double safety)
+			// AND (tab is hidden OR it's from a different chat)
+			if (newMessage.senderId !== authUser?._id) {
+				if (document.hidden || selectedUser?._id !== newMessage.senderId) {
+					showNotification(newMessage);
+				}
 			}
 		};
 
 		socket.on("newMessage", handleNewMessage);
 
 		return () => socket.off("newMessage", handleNewMessage);
-	}, [socket, setMessages, messages, selectedUser]);
+	}, [socket, selectedUser, authUser]);
 };
 
 const showNotification = (message) => {

@@ -7,10 +7,34 @@ export const getUsersForSidebar = async (req, res) => {
 	try {
 		const loggedInUserId = req.user._id;
 
-		// find all users in the database except the currently logged in one
-		const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
+		// 1. Get all conversations for the logged-in user, sorted by most recent first
+		const conversations = await Conversation.find({
+			participants: loggedInUserId,
+		}).sort({ updatedAt: -1 });
 
-		res.status(200).json(filteredUsers);
+		// 2. Extract the other participant IDs from these conversations (in order)
+		const interactedUserIds = conversations.map(conv =>
+			conv.participants.find(p => p.toString() !== loggedInUserId.toString())
+		).filter(Boolean);
+
+		// 3. Get all users except the logged-in one
+		const allUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
+
+		// 4. Sort the users: those in interactedUserIds first (maintaining order), then the rest
+		const sortedUsers = [...allUsers].sort((a, b) => {
+			const indexA = interactedUserIds.indexOf(a._id.toString());
+			const indexB = interactedUserIds.indexOf(b._id.toString());
+
+			// If both have interactions, sort by their position in interactedUserIds (recency)
+			if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+			// If only one has interaction, put it first
+			if (indexA !== -1) return -1;
+			if (indexB !== -1) return 1;
+			// If neither has interactions, maintain alphabetical or original order
+			return a.fullName.localeCompare(b.fullName);
+		});
+
+		res.status(200).json(sortedUsers);
 	} catch (error) {
 		console.error("Error in getUsersForSidebar: ", error);
 		res.status(500).json({ error: "Internal server error" });

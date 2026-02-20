@@ -19,12 +19,16 @@ import { useThemeStore } from "./store/useThemeStore";
 import { useAuthStore } from "./store/useAuthStore";
 import { useSocket } from "./context/SocketContext";
 import { useCallStore } from "./store/useCallStore";
+import useListenMessages from "./hooks/useListenMessages";
 
 function App() {
     const { authUser, isCheckingAuth, checkAuth } = useAuthStore();
     const { socket } = useSocket();
     const { theme } = useThemeStore();
     const navigate = useNavigate();
+
+    // Start global message listening for notifications
+    useListenMessages();
 
     // Destructure all necessary methods from the call store
     const { setIncomingCallData, handleCallAccepted, handleNewIceCandidate, hangup, handleRenegotiation } = useCallStore();
