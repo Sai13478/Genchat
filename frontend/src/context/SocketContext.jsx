@@ -18,13 +18,13 @@ export const SocketContextProvider = ({ children }) => {
 		if (authUser) {
 			// In dev: connect to same origin (Vite proxy handles /socket.io)
 			// In prod: connect to VITE_BACKEND_URL
-			const backendUrl = import.meta.env.VITE_BACKEND_URL;
+			const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://genchat-vi93.onrender.com";
 
-			if (!backendUrl && import.meta.env.PROD) {
-				console.error("ERROR: VITE_BACKEND_URL is not defined in production environment!");
+			if (!import.meta.env.VITE_BACKEND_URL && import.meta.env.PROD) {
+				console.warn("VITE_BACKEND_URL is not defined. Falling back to hardcoded Render URL.");
 			}
 
-			const newSocket = io(backendUrl || undefined, {
+			const newSocket = io(backendUrl, {
 				query: {
 					userId: authUser._id,
 				},

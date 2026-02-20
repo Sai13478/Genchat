@@ -99,12 +99,7 @@ const LoginPage = () => {
             </button>
           </form>
 
-          <div className="divider">OR</div>
 
-          <button className="btn btn-outline w-full" onClick={loginWithPasskey} disabled={isLoggingIn}>
-            <Fingerprint className="size-5" />
-            Sign in with a Passkey
-          </button>
 
           <div className="text-center">
             <p className="text-base-content/60">

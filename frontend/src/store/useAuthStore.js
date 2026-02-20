@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import apiClient from "../lib/apiClient";
 import toast from "react-hot-toast";
-import { startRegistration, startAuthentication } from "@simplewebauthn/browser";
 
 export const useAuthStore = create((set, get) => ({
   authUser: null,
@@ -78,47 +77,6 @@ export const useAuthStore = create((set, get) => ({
       toast.error(error?.response?.data?.error || "Profile update failed");
     } finally {
       set({ isUpdatingProfile: false });
-    }
-  },
-
-  registerPasskey: async () => {
-    try {
-      // 1. Get options from server
-      const options = await apiClient.get("/passkeys/register-options");
-
-      // 2. Ask browser for new credential
-      const attestation = await startRegistration({ optionsJSON: options.data });
-
-      // 3. Send new credential to server for verification
-      await apiClient.post("/passkeys/verify-registration", attestation);
-
-      toast.success("Passkey registered successfully!");
-      // Optionally, refresh user data to show new passkey
-      get().checkAuth();
-    } catch (error) {
-      const errorMessage = error.response?.data?.error || "Passkey registration failed.";
-      console.error("Passkey registration error:", error);
-      toast.error(errorMessage);
-    }
-  },
-
-  loginWithPasskey: async () => {
-    set({ isLoggingIn: true });
-    try {
-      // 1. Get options from server
-      const options = await apiClient.get("/passkeys/login-options");
-
-      // 2. Ask browser for assertion
-      const assertion = await startAuthentication({ optionsJSON: options.data });
-
-      // 3. Send assertion to server for verification
-      const res = await apiClient.post("/passkeys/verify-login", assertion);
-      set({ authUser: res.data });
-      toast.success("Logged in successfully with passkey!");
-    } catch (error) {
-      toast.error(error?.response?.data?.error || "Passkey login failed.");
-    } finally {
-      set({ isLoggingIn: false });
     }
   },
 }));
