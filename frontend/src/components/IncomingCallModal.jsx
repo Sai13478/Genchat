@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCallStore } from "../store/useCallStore";
 import { useSocket } from "../context/SocketContext";
@@ -7,6 +8,29 @@ const IncomingCallModal = () => {
     const { incomingCallData, answerCall, declineCall } = useCallStore();
     const { socket } = useSocket();
     const navigate = useNavigate();
+    const ringtoneRef = useRef(null);
+
+    useEffect(() => {
+        if (incomingCallData) {
+            // Initialize ringtone
+            ringtoneRef.current = new Audio("/ringtone.mp3");
+            ringtoneRef.current.loop = true;
+
+            // Play ringtone (handle potential autoplay restrictions)
+            ringtoneRef.current.play().catch((error) => {
+                console.warn("Ringtone autoplay prevented: ", error);
+            });
+        }
+
+        // Cleanup: stop audio when user answers/declines or component unmounts
+        return () => {
+            if (ringtoneRef.current) {
+                ringtoneRef.current.pause();
+                ringtoneRef.current.currentTime = 0;
+                ringtoneRef.current = null;
+            }
+        };
+    }, [incomingCallData]);
 
     if (!incomingCallData) {
         return null;
