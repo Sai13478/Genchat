@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-const API_URL = process.env.API_URL || 'http://localhost:3000/api';
+const API_URL = process.env.VITE_API_URL || 'http://localhost:3000/api';
 const TEST_EMAIL = `testuser_${Date.now()}@example.com`;
 const TEST_PASSWORD = 'testpassword123';
 

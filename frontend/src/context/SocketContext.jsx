@@ -16,12 +16,16 @@ export const SocketContextProvider = ({ children }) => {
 
 	useEffect(() => {
 		if (authUser) {
+<<<<<<< HEAD
 			// In dev: connect to same origin (Vite proxy handles /socket.io)
 			// In prod: connect to VITE_BACKEND_URL
 			const backendUrl = import.meta.env.PROD
 				? import.meta.env.VITE_BACKEND_URL
 				: undefined; // undefined = connect to same origin
 			const newSocket = io(backendUrl, {
+=======
+			const newSocket = io(import.meta.env.VITE_API_URL || "http://localhost:3000", {
+>>>>>>> ba34a9c1988a43f2cfab4f9fc5544819108a81a2
 				query: {
 					userId: authUser._id,
 				},

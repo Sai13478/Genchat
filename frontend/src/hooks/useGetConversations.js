@@ -6,12 +6,13 @@ import { useAuthStore } from "../store/useAuthStore";
 const useGetConversations = () => {
 	const [loading, setLoading] = useState(false);
 	const [conversations, setConversations] = useState([]);
-	const { authUser } = useAuthStore();
+	const { authUser, isCheckingAuth } = useAuthStore();
 
 	useEffect(() => {
 		const getConversations = async () => {
 			setLoading(true);
 			try {
+				debugger
 				const res = await apiClient.get("/messages/conversations");
 				setConversations(res.data);
 			} catch (error) {
@@ -24,11 +25,11 @@ const useGetConversations = () => {
 			}
 		};
 
-		// Only fetch conversations if there is an authenticated user.
-		if (authUser) {
+		// Only fetch conversations if the initial auth check is complete and there is an authenticated user.
+		if (authUser && !isCheckingAuth) {
 			getConversations();
 		}
-	}, [authUser]);
+	}, [authUser, isCheckingAuth]);
 
 	return { loading, conversations };
 };
