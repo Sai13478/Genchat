@@ -11,11 +11,16 @@ import { generateToken } from "../lib/utils.js";
 // Relying Party (your application)
 const rpName = "GenChat";
 // Use host from request if RP_ID is not set
-const getRpID = (req) => process.env.RP_ID || req.get('host').split(':')[0];
+const getRpID = (req) => {
+	if (process.env.RP_ID) return process.env.RP_ID;
+	const host = req.get('x-forwarded-host') || req.get('host');
+	return host.split(':')[0];
+};
+
 const getOrigin = (req) => {
 	if (process.env.NODE_ENV === "production" && process.env.ORIGIN) return process.env.ORIGIN;
-	const protocol = req.protocol;
-	const host = req.get('host');
+	const protocol = req.get('x-forwarded-proto') || req.protocol;
+	const host = req.get('x-forwarded-host') || req.get('host');
 	return `${protocol}://${host}`;
 };
 

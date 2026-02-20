@@ -20,7 +20,7 @@ export const SocketContextProvider = ({ children }) => {
 			// In prod: connect to VITE_BACKEND_URL
 			const backendUrl = import.meta.env.PROD
 				? import.meta.env.VITE_BACKEND_URL
-				: undefined; // undefined = connect to same origin
+				: import.meta.env.VITE_BACKEND_URL || undefined; // Use variable if available even in dev
 			const newSocket = io(backendUrl, {
 				query: {
 					userId: authUser._id,
