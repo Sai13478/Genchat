@@ -1,6 +1,6 @@
 import { THEMES } from "../constants";
 import { useThemeStore } from "../store/useThemeStore";
-import { Send, Fingerprint } from "lucide-react";
+import { Send } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 
 const PREVIEW_MESSAGES = [
