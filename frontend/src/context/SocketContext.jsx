@@ -18,13 +18,17 @@ export const SocketContextProvider = ({ children }) => {
 		if (authUser) {
 			// In dev: connect to same origin (Vite proxy handles /socket.io)
 			// In prod: connect to VITE_BACKEND_URL
-			const backendUrl = import.meta.env.PROD
-				? import.meta.env.VITE_BACKEND_URL
-				: import.meta.env.VITE_BACKEND_URL || undefined; // Use variable if available even in dev
-			const newSocket = io(backendUrl, {
+			const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+			if (!backendUrl && import.meta.env.PROD) {
+				console.error("ERROR: VITE_BACKEND_URL is not defined in production environment!");
+			}
+
+			const newSocket = io(backendUrl || undefined, {
 				query: {
 					userId: authUser._id,
 				},
+				transports: ['websocket', 'polling'], // Prioritize websocket
 			});
 
 			setSocket(newSocket);
