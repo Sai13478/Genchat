@@ -11,11 +11,14 @@ import callLogRoutes from "./routes/call.route.js";
 
 dotenv.config();
 
-const app = express();
-
 import { checkOrigin } from "./lib/origin.js";
 
-// ...existing code...
+const app = express();
+
+app.set('trust proxy', 1); // Trust Render's proxy
+app.use(express.json({ limit: "50mb" }));
+app.use(cookieParser());
+
 
 const corsOptions = {
   origin: checkOrigin,

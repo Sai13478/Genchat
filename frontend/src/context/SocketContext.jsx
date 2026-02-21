@@ -16,15 +16,16 @@ export const SocketContextProvider = ({ children }) => {
 
 	useEffect(() => {
 		if (authUser) {
-			// In dev: connect to same origin (Vite proxy handles /socket.io)
+			// In dev: empty string uses window.location.origin (Vite proxy handles /socket.io)
 			// In prod: connect to VITE_BACKEND_URL
-			let backendUrl = import.meta.env.VITE_BACKEND_URL;
+			let backendUrl = "";
 
-			// Sanity check: Avoid strings like "undefined" or empty strings
-			if (!backendUrl || backendUrl === "undefined" || !backendUrl.startsWith("http")) {
-				backendUrl = "https://genchat-vi93.onrender.com";
-				if (import.meta.env.PROD) {
-					console.warn("VITE_BACKEND_URL is invalid or missing. Falling back to hardcoded Render URL.");
+			if (import.meta.env.PROD) {
+				backendUrl = import.meta.env.VITE_BACKEND_URL;
+				// Sanity check for production
+				if (!backendUrl || backendUrl === "undefined" || !backendUrl.startsWith("http")) {
+					backendUrl = "https://genchat-vi93.onrender.com";
+					console.warn("VITE_BACKEND_URL is invalid or missing in production. Falling back to hardcoded Render URL.");
 				}
 			}
 
