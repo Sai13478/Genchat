@@ -13,30 +13,12 @@ dotenv.config();
 
 const app = express();
 
-app.set('trust proxy', 1); // Trust Render's proxy
-app.use(express.json({ limit: "50mb" }));
-app.use(cookieParser());
-
-// Configure allowed origins based on environment
-const allowedOrigins = [
-  '*',
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-];
-
-if (process.env.FRONTEND_URLS) {
-  const frontendUrls = process.env.FRONTEND_URLS.split(',').map(url => url.trim());
-  allowedOrigins.push(...frontendUrls);
-}
-
-const validOrigins = [...new Set(allowedOrigins.filter(Boolean))];
-console.log('Allowed CORS origins:', validOrigins);
-
+import { checkOrigin } from "./lib/origin.js";
 
 // ...existing code...
 
 const corsOptions = {
-  origin: validOrigins,
+  origin: checkOrigin,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'cache-control', 'pragma'],
@@ -44,6 +26,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions)); // <-- use the same options here
+
 
 // ...existing code...
 // API Routes

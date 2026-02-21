@@ -1,6 +1,6 @@
 import User from "../models/user.model.js";
 import bcrypt from "bcryptjs";
-import generateTokenAndSetCookie from "../utils/generateToken.js";
+import { generateToken } from "../lib/utils.js";
 import cloudinary from "../lib/cloudinary.js"; // Assuming cloudinary config is in lib/cloudinary.js
 
 export const signup = async (req, res) => {
@@ -38,7 +38,7 @@ export const signup = async (req, res) => {
 		await newUser.save();
 
 		// Generate JWT token and set cookie
-		generateTokenAndSetCookie(newUser._id, res);
+		generateToken(newUser._id, res);
 
 		// Return user data without the password
 		res.status(201).json({
@@ -77,7 +77,7 @@ export const login = async (req, res) => {
 			return res.status(400).json({ error: "Invalid credentials" });
 		}
 
-		generateTokenAndSetCookie(user._id, res);
+		generateToken(user._id, res);
 
 		res.status(200).json({
 			_id: user._id,

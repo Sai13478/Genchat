@@ -10,27 +10,19 @@ dotenv.config();
 
 const server = http.createServer(app);
 
-const allowedOrigins = [
-  '*',
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-];
+import { checkOrigin } from "./origin.js";
 
-if (process.env.FRONTEND_URLS) {
-  const frontendUrls = process.env.FRONTEND_URLS.split(',').map(url => url.trim());
-  allowedOrigins.push(...frontendUrls);
-}
-
-const validOrigins = [...new Set(allowedOrigins.filter(Boolean))];
+// ...existing code...
 
 const io = new Server(server, {
   cors: {
-    origin: validOrigins,
+    origin: checkOrigin,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true,
   },
   allowEIO3: true,
 });
+
 
 // Store online users in a mapping: { userId: Set<socketId> }
 const userSocketMap = new Map();
