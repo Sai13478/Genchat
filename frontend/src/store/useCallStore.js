@@ -26,19 +26,22 @@ const configuration = {
 };
 
 export const useCallStore = create((set, get) => ({
-    incomingCallData: null,
-    callAccepted: false,
-    callStartTime: null,
-    localStream: null,
-    remoteStream: null,
-    callState: "idle", // 'idle', 'ringing', 'calling', 'connected', 'failed'
-    callType: null,
-    callee: null,
-    caller: null,
-    callId: null,
-    isScreenSharing: false,
-    isMuted: false,
-    isVideoEnabled: false,
+    iceCandidateQueue: [],
+
+    _processIceCandidateQueue: async () => {
+        const { iceCandidateQueue } = get();
+        if (!peerConnection || !peerConnection.remoteDescription) return;
+
+        console.log(`Processing ${iceCandidateQueue.length} queued ICE candidates.`);
+        for (const candidate of iceCandidateQueue) {
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (error) {
+                console.error("Error adding queued ICE candidate:", error);
+            }
+        }
+        set({ iceCandidateQueue: [] });
+    },
 
     _createPeerConnection: (socket) => {
         if (peerConnection) {
@@ -47,8 +50,9 @@ export const useCallStore = create((set, get) => ({
         }
         peerConnection = new RTCPeerConnection(configuration);
         console.log("Created new peer connection.");
+        set({ iceCandidateQueue: [] }); // Reset queue for new connection
 
-        // Log state changes for debugging
+        // ... existing state change logs ...
         peerConnection.onsignalingstatechange = () => {
             if (peerConnection) {
                 console.log(`Signaling state change: ${peerConnection.signalingState}`);
@@ -95,16 +99,10 @@ export const useCallStore = create((set, get) => ({
             console.log("Received remote track:", event.track.kind);
 
             set((state) => {
-                // Get the current stream or create a new one
                 const currentStream = state.remoteStream || new MediaStream();
-
-                // Only add the track if it's not already there
                 if (!currentStream.getTracks().find(t => t.id === event.track.id)) {
                     currentStream.addTrack(event.track);
                 }
-
-                // IMPORTANT: We must return a NEW MediaStream instance to trigger React state updates
-                // but we use the tracks from the current accumulated stream.
                 return { remoteStream: new MediaStream(currentStream.getTracks()) };
             });
         };
@@ -137,7 +135,6 @@ export const useCallStore = create((set, get) => ({
         set({ callState: "calling", callee, callType, isVideoEnabled: callType === "video" });
         get()._createPeerConnection(socket);
 
-        // Add tracks after setting up the peer connection to trigger onnegotiationneeded
         const { localStream } = get();
         if (localStream) {
             localStream.getTracks().forEach((track) => {
@@ -153,7 +150,6 @@ export const useCallStore = create((set, get) => ({
         const { callType } = incomingCallData;
 
         try {
-            // 1. Get local stream for the receiver
             const videoConstraints = {
                 width: { ideal: 1280 },
                 height: { ideal: 720 },
@@ -164,7 +160,6 @@ export const useCallStore = create((set, get) => ({
                 audio: true,
             });
 
-            // 2. Update state: set local stream, clear incoming call, and set state to connected
             set({
                 localStream: stream,
                 isVideoEnabled: callType === "video",
@@ -174,12 +169,13 @@ export const useCallStore = create((set, get) => ({
                 callStartTime: Date.now(),
             });
 
-            // 3. Create peer connection and answer the call
             get()._createPeerConnection(socket);
 
             await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingCallData.offer));
 
-            // Add local tracks after setting remote description
+            // Process queued candidates now that remoteDescription is set
+            await get()._processIceCandidateQueue();
+
             if (stream) {
                 stream.getTracks().forEach((track) => {
                     peerConnection.addTrack(track, stream);
@@ -193,19 +189,18 @@ export const useCallStore = create((set, get) => ({
         } catch (error) {
             console.error("Error answering call:", error);
             toast.error("Could not answer call. Please allow camera and microphone access.");
-            get().declineCall(socket); // Decline if permissions are denied
+            get().declineCall(socket);
         }
     },
 
     handleCallAccepted: async (answer) => {
-        if (!peerConnection) {
-            console.error("handleCallAccepted: peerConnection is not initialized!");
-            return;
-        }
-        console.log(`Current signaling state: ${peerConnection.signalingState}. Attempting to set remote answer.`);
+        if (!peerConnection) return;
         try {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
             set({ callState: "connected", callAccepted: true, callStartTime: Date.now() });
+
+            // Process queued candidates
+            await get()._processIceCandidateQueue();
         } catch (error) {
             console.error("Error setting remote description:", error);
         }
@@ -215,6 +210,8 @@ export const useCallStore = create((set, get) => ({
         if (!peerConnection) return;
         try {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            await get()._processIceCandidateQueue();
+
             const answer = await peerConnection.createAnswer();
             await peerConnection.setLocalDescription(answer);
             const { callee, caller, callId } = get();
@@ -228,14 +225,17 @@ export const useCallStore = create((set, get) => ({
     },
 
     handleNewIceCandidate: async (candidate) => {
-        if (peerConnection && candidate) {
-            try {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-            } catch (error) {
-                console.error("Error adding received ICE candidate", error);
-            }
+        if (!peerConnection || !peerConnection.remoteDescription) {
+            set((state) => ({ iceCandidateQueue: [...state.iceCandidateQueue, candidate] }));
+            return;
+        }
+        try {
+            await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (error) {
+            console.error("Error adding received ICE candidate", error);
         }
     },
+
 
     declineCall: (socket) => {
         const { incomingCallData } = get();
@@ -270,6 +270,8 @@ export const useCallStore = create((set, get) => ({
         if (localStream) localStream.getTracks().forEach((track) => track.stop());
         if (remoteStream) remoteStream.getTracks().forEach((track) => track.stop());
 
+        makingOffer = false; // Reset module-level state
+
         set({
             incomingCallData: null,
             callAccepted: false,
@@ -284,6 +286,7 @@ export const useCallStore = create((set, get) => ({
             isScreenSharing: false,
             isMuted: false,
             isVideoEnabled: false,
+            iceCandidateQueue: [],
         });
     },
 
