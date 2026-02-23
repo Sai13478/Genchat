@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LogOut, Search } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useSocket } from "../context/SocketContext";
@@ -15,7 +15,7 @@ const Sidebar = () => {
     const [searchResult, setSearchResult] = useState(null);
     const [isSearching, setIsSearching] = useState(false);
 
-    useState(() => {
+    useEffect(() => {
         getUsers();
     }, [getUsers]);
 

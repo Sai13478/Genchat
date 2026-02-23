@@ -19,6 +19,7 @@ import { useThemeStore } from "./store/useThemeStore";
 import { useAuthStore } from "./store/useAuthStore";
 import { useSocket } from "./context/SocketContext";
 import { useCallStore } from "./store/useCallStore";
+import { useChatStore } from "./store/useChatStore";
 import useListenMessages from "./hooks/useListenMessages";
 
 function App() {
