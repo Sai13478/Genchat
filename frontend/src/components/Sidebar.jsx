@@ -4,12 +4,14 @@ import { useAuthStore } from "../store/useAuthStore";
 import { useSocket } from "../context/SocketContext";
 import { useChatStore } from "../store/useChatStore";
 import Conversation from "./Conversation";
+import toast from "react-hot-toast";
 
 const Sidebar = () => {
     const { authUser } = useAuthStore();
     const { onlineUsers } = useSocket();
     const { users, getUsers, isUsersLoading, searchUser, addFriend } = useChatStore();
-    const [searchQuery, setSearchQuery] = useState("");
+    const [usernameQuery, setUsernameQuery] = useState("");
+    const [tagQuery, setTagQuery] = useState("");
     const [searchResult, setSearchResult] = useState(null);
     const [isSearching, setIsSearching] = useState(false);
 
@@ -19,12 +21,18 @@ const Sidebar = () => {
 
     const handleSearch = async (e) => {
         e.preventDefault();
-        if (!searchQuery.includes("#")) {
-            toast.error("Format must be username#tag");
+        if (!usernameQuery.trim() || !tagQuery.trim()) {
+            toast.error("Both username and tag are required");
             return;
         }
+
+        if (tagQuery.length !== 4 || isNaN(tagQuery)) {
+            toast.error("Tag must be a 4-digit number");
+            return;
+        }
+
         setIsSearching(true);
-        const result = await searchUser(searchQuery);
+        const result = await searchUser(`${usernameQuery}#${tagQuery}`);
         setSearchResult(result);
         setIsSearching(false);
     };
@@ -33,7 +41,8 @@ const Sidebar = () => {
         if (searchResult) {
             await addFriend(searchResult._id);
             setSearchResult(null);
-            setSearchQuery("");
+            setUsernameQuery("");
+            setTagQuery("");
         }
     };
 
@@ -47,18 +56,31 @@ const Sidebar = () => {
             </div>
 
             {/* Search bar */}
-            <form onSubmit={handleSearch} className='mb-4 relative'>
-                <Search className='absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400' />
-                <input
-                    type='text'
-                    placeholder='Search username#1234'
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className='input input-sm input-bordered w-full pl-9 pr-12'
-                />
-                <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-primary font-bold">
-                    {isSearching ? "..." : "Find"}
-                </button>
+            <form onSubmit={handleSearch} className='mb-4 space-y-2'>
+                <div className="flex gap-2">
+                    <div className="relative flex-1">
+                        <Search className='absolute left-2 top-1/2 -translate-y-1/2 size-3 text-gray-400' />
+                        <input
+                            type='text'
+                            placeholder='Username'
+                            value={usernameQuery}
+                            onChange={(e) => setUsernameQuery(e.target.value)}
+                            className='input input-xs input-bordered w-full pl-7'
+                        />
+                    </div>
+                    <div className="flex items-center text-xs opacity-50">#</div>
+                    <input
+                        type='text'
+                        placeholder='Tag'
+                        maxLength={4}
+                        value={tagQuery}
+                        onChange={(e) => setTagQuery(e.target.value.replace(/\D/g, ""))}
+                        className='input input-xs input-bordered w-16 text-center'
+                    />
+                    <button type="submit" className="btn btn-xs btn-primary">
+                        {isSearching ? "..." : "Find"}
+                    </button>
+                </div>
             </form>
 
             {/* Search Result */}
