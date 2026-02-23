@@ -43,7 +43,6 @@ async function testSignup() {
   try {
     logStep('Testing signup...');
     const response = await api.post('/auth/signup', {
-      fullName: 'Test User',
       username: `testuser_${Date.now()}`,
       email: TEST_EMAIL,
       password: TEST_PASSWORD,
@@ -51,11 +50,13 @@ async function testSignup() {
     });
 
     console.log('✅ Signup successful:', {
-      userId: response.data.user._id,
-      email: response.data.user.email,
+      userId: response.data._id,
+      username: response.data.username,
+      tag: response.data.tag,
+      email: response.data.email,
     });
 
-    return response.data.user;
+    return response.data;
   } catch (error) {
     handleApiError(error, 'during signup');
   }
@@ -83,10 +84,10 @@ async function testLogin() {
     console.log(`🔑 Received JWT cookie: ${authTokenCookie}`);
 
     console.log('✅ Login successful:', {
-      userId: response.data.user._id,
-      email: response.data.user.email,
+      userId: response.data._id,
+      email: response.data.email,
     });
-    return response.data.user;
+    return response.data;
   } catch (error) {
     handleApiError(error, 'during login');
   }
@@ -147,7 +148,7 @@ async function testProfileUpdate() {
       profilePic: response.data.user.profilePic,
     });
 
-    return response.data.user;
+    return response.data;
   } catch (error) {
     handleApiError(error, 'during profile update');
   }
