@@ -17,27 +17,26 @@ export const generateToken = (userId, res) => {
   const cookieOptions = {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     httpOnly: true,
-    secure: true, // Always secure for modern browsers/cross-site
-    sameSite: 'none', // Required for cross-site cookies (different devices/origins)
-    path: '/',
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
   };
 
   // Set the cookie
-  res.cookie('jwt', token, cookieOptions);
+  res.cookie("jwt", token, cookieOptions);
 
   // Also set the token in the response header for API clients
-  res.setHeader('Authorization', `Bearer ${token}`);
+  res.setHeader("Authorization", `Bearer ${token}`);
 
   return token;
 };
 
 // Helper to clear the JWT cookie
 export const clearToken = (res) => {
-  res.clearCookie('jwt', {
+  res.clearCookie("jwt", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    path: '/',
-    domain: process.env.NODE_ENV === 'production' ? '.yourdomain.com' : undefined
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
   });
 };

@@ -62,8 +62,7 @@ export const getUsersForSidebar = async (req, res) => {
 
 export const searchUser = async (req, res) => {
 	try {
-		const { query } = req.params; // Expecting "username#tag"
-		const [username, tag] = query.split("#");
+		const { q: query } = req.query; // Expecting "username#tag" via ?q=...
 
 		if (!username || !tag) {
 			return res.status(400).json({ error: "Invalid search query. Use 'username#tag'." });

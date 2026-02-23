@@ -6,7 +6,7 @@ const router = express.Router();
 
 // This route MUST be protected to know who the current user is
 router.get("/users", protectRoute, getUsersForSidebar);
-router.get("/search/:query", protectRoute, searchUser);
+router.get("/search", protectRoute, searchUser);
 router.post("/add-friend", protectRoute, addFriend);
 router.get("/:id", protectRoute, getMessages);
 
