@@ -9,7 +9,7 @@ export const signup = async (req, res) => {
 
 		if (!username || !email || !password || !confirmPassword) {
 			const missing = ["username", "email", "password", "confirmPassword"].filter(f => !req.body[f]);
-			return res.status(400).json({ error: `[V2] Please provide all required fields. Missing: ${missing.join(", ")}` });
+			return res.status(400).json({ error: `[DEPLOYED] Please provide all required fields. Missing: ${missing.join(", ")}` });
 		}
 
 		if (password !== confirmPassword) {
