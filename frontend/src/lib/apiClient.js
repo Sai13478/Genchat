@@ -22,7 +22,7 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
 	(config) => {
 		const token = localStorage.getItem("genchat-token");
-		if (token) {
+		if (token && !config.headers.Authorization) {
 			config.headers.Authorization = `Bearer ${token}`;
 		}
 		return config;
@@ -36,15 +36,19 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
 	(response) => response,
 	(error) => {
+		// Only clear if it's a 401 and we actually had a user (to avoid loops or clearing on initial check)
 		if (error.response?.status === 401) {
-			localStorage.removeItem("genchat-token");
-			// Dynamically import to avoid circular dependency
-			import("../store/useAuthStore.js").then(({ useAuthStore }) => {
-				const { authUser } = useAuthStore.getState();
-				if (authUser) {
-					useAuthStore.setState({ authUser: null });
-				}
-			});
+			const token = localStorage.getItem("genchat-token");
+			if (token) {
+				localStorage.removeItem("genchat-token");
+				// Dynamically import to avoid circular dependency
+				import("../store/useAuthStore.js").then(({ useAuthStore }) => {
+					const { authUser } = useAuthStore.getState();
+					if (authUser) {
+						useAuthStore.setState({ authUser: null });
+					}
+				});
+			}
 		}
 		return Promise.reject(error);
 	}

@@ -12,15 +12,12 @@ export const useAuthStore = create((set, get) => ({
   checkAuth: async () => {
     set({ isCheckingAuth: true });
     try {
-      // Prioritize the token from localStorage if present
-      const token = localStorage.getItem("genchat-token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-      const res = await apiClient.get("/auth/check", { headers });
+      const res = await apiClient.get("/auth/check");
       set({ authUser: res.data });
     } catch (error) {
+      console.error("Error in checkAuth:", error);
       set({ authUser: null });
-      localStorage.removeItem("genchat-token");
+      // apiClient response interceptor handles clearing localStorage
     } finally {
       set({ isCheckingAuth: false });
     }
