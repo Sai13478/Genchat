@@ -185,7 +185,6 @@ export const acceptFriendRequest = async (req, res) => {
 		}
 
 		// Add each other as friends if not already friends
-		// Add each other as friends if not already friends
 		if (!user.friends.some(f => f.toString() === requestId.toString())) {
 			user.friends.push(requestId);
 		}
@@ -205,18 +204,25 @@ export const acceptFriendRequest = async (req, res) => {
 		}
 
 		// Socket notification for the other person
-		const { getIO, getReceiverSocketIds } = await import("../lib/socket.js");
-		const io = getIO();
-		const friendSocketIds = getReceiverSocketIds(requestId);
-		friendSocketIds.forEach(socketId => {
-			io.to(socketId).emit("friendRequestAccepted", {
-				_id: user._id,
-				username: user.username,
-				tag: user.tag,
-				profilePic: user.profilePic
+		try {
+			console.log(`[FriendRequest] Attempting socket notification to ${requestId}`);
+			const { getIO, getReceiverSocketIds } = await import("../lib/socket.js");
+			const io = getIO();
+			const friendSocketIds = getReceiverSocketIds(requestId);
+			friendSocketIds.forEach(socketId => {
+				io.to(socketId).emit("friendRequestAccepted", {
+					_id: user._id,
+					username: user.username,
+					tag: user.tag,
+					profilePic: user.profilePic
+				});
 			});
-		});
+		} catch (socketError) {
+			console.error("[FriendRequest] Socket notification failed:", socketError);
+			// We don't want to fail the whole friend request if just the socket notification fails
+		}
 
+		console.log(`[FriendRequest] Successfully accepted request for ${userId}`);
 		res.status(200).json({ message: "Friend request accepted.", friend: { _id: friendUser._id, username: friendUser.username, tag: friendUser.tag, profilePic: friendUser.profilePic } });
 	} catch (error) {
 		console.error("Error in acceptFriendRequest:", error);

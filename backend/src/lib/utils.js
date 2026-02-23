@@ -33,10 +33,11 @@ export const generateTokens = async (userId, res, deviceInfo = "unknown") => {
   });
 
   // Set cookies with secure defaults
+  // For cross-site (Vercel -> Render), we MUST use SameSite=None and Secure=True
   const cookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: true, // Required for SameSite=None
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     path: "/",
   };
 
@@ -60,8 +61,8 @@ export const generateTokens = async (userId, res, deviceInfo = "unknown") => {
 export const clearTokens = (res) => {
   const cookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: true,
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     path: "/",
   };
   res.clearCookie("accessToken", cookieOptions);
