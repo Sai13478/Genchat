@@ -2,6 +2,7 @@ import express from "express";
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from "dotenv";
+import path from "path";
 import passkeyRoutes from "./routes/passkey.route.js";
 
 // Route imports
@@ -37,6 +38,16 @@ app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/v1/users/call-logs", callLogRoutes);
 app.use("/api/passkeys", passkeyRoutes);
+
+const __dirname = path.resolve();
+
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../frontend/dist")));
+
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
+  });
+}
 
 // Add health check endpoint
 app.get('/health', (req, res) => {
