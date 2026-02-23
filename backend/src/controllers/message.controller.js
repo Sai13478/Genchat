@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import Conversation from "../models/conversation.model.js";
 import Message from "../models/message.model.js";
@@ -162,17 +163,30 @@ export const acceptFriendRequest = async (req, res) => {
 		const { requestId } = req.body;
 		const userId = req.user._id;
 
+		console.log(`[FriendRequest] Accepting request from ${requestId} for user ${userId}`);
+
+		if (!requestId || !mongoose.Types.ObjectId.isValid(requestId)) {
+			console.error(`[FriendRequest] Invalid requestId: ${requestId}`);
+			return res.status(400).json({ error: "Invalid request ID." });
+		}
+
 		const user = await User.findById(userId);
 		if (!user) return res.status(404).json({ error: "User not found." });
 
-		const requestIndex = user.friendRequests.findIndex(fr => fr.from && fr.from.toString() === requestId);
+		const requestIndex = user.friendRequests.findIndex(fr => fr.from && fr.from.toString() === requestId.toString());
 
 		if (requestIndex === -1) {
+			console.warn(`[FriendRequest] Request not found in user's list. User: ${userId}, RequestFrom: ${requestId}`);
+			// Check if already friends anyway
+			if (user.friends.some(f => f.toString() === requestId.toString())) {
+				return res.status(200).json({ message: "You are already friends." });
+			}
 			return res.status(404).json({ error: "Friend request not found." });
 		}
 
 		// Add each other as friends if not already friends
-		if (!user.friends.includes(requestId)) {
+		// Add each other as friends if not already friends
+		if (!user.friends.some(f => f.toString() === requestId.toString())) {
 			user.friends.push(requestId);
 		}
 
@@ -185,7 +199,7 @@ export const acceptFriendRequest = async (req, res) => {
 			return res.status(404).json({ error: "Sender user no longer exists." });
 		}
 
-		if (!friendUser.friends.includes(userId)) {
+		if (!friendUser.friends.some(f => f.toString() === userId.toString())) {
 			friendUser.friends.push(userId);
 			await friendUser.save();
 		}
@@ -206,7 +220,7 @@ export const acceptFriendRequest = async (req, res) => {
 		res.status(200).json({ message: "Friend request accepted.", friend: { _id: friendUser._id, username: friendUser.username, tag: friendUser.tag, profilePic: friendUser.profilePic } });
 	} catch (error) {
 		console.error("Error in acceptFriendRequest:", error);
-		res.status(500).json({ error: "Internal Server Error" });
+		res.status(500).json({ error: "Internal Server Error", details: error.message });
 	}
 };
 
@@ -215,16 +229,29 @@ export const rejectFriendRequest = async (req, res) => {
 		const { requestId } = req.body;
 		const userId = req.user._id;
 
+		console.log(`[FriendRequest] Rejecting request from ${requestId} for user ${userId}`);
+
+		if (!requestId || !mongoose.Types.ObjectId.isValid(requestId)) {
+			console.error(`[FriendRequest] Invalid requestId: ${requestId}`);
+			return res.status(400).json({ error: "Invalid request ID." });
+		}
+
 		const user = await User.findById(userId);
 		if (!user) return res.status(404).json({ error: "User not found." });
 
-		user.friendRequests = user.friendRequests.filter(fr => fr.from && fr.from.toString() !== requestId);
+		const initialLength = user.friendRequests.length;
+		user.friendRequests = user.friendRequests.filter(fr => fr.from && fr.from.toString() !== requestId.toString());
+
+		if (user.friendRequests.length === initialLength) {
+			console.warn(`[FriendRequest] No request found to reject. User: ${userId}, RequestFrom: ${requestId}`);
+		}
+
 		await user.save();
 
 		res.status(200).json({ message: "Friend request rejected." });
 	} catch (error) {
 		console.error("Error in rejectFriendRequest:", error);
-		res.status(500).json({ error: "Internal Server Error" });
+		res.status(500).json({ error: "Internal Server Error", details: error.message });
 	}
 };
 
