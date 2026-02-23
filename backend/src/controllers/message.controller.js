@@ -161,103 +161,155 @@ export const getFriendRequests = async (req, res) => {
 export const acceptFriendRequest = async (req, res) => {
 	try {
 		const { requestId } = req.body;
+		if (!req.user || !req.user._id) {
+			return res.status(401).json({ error: "Unauthorized" });
+		}
 		const userId = req.user._id;
 
-		console.log(`[FriendRequest] Accepting request from ${requestId} for user ${userId}`);
+		console.log(`[FriendRequest] Starting accept process. From: ${requestId}, To: ${userId}`);
 
 		if (!requestId || !mongoose.Types.ObjectId.isValid(requestId)) {
-			console.error(`[FriendRequest] Invalid requestId: ${requestId}`);
-			return res.status(400).json({ error: "Invalid request ID." });
+			console.error(`[FriendRequest] Invalid requestId format: ${requestId}`);
+			return res.status(400).json({ error: "Invalid request ID format." });
 		}
 
-		const user = await User.findById(userId);
-		if (!user) return res.status(404).json({ error: "User not found." });
+		// Fetch both users in parallel for efficiency
+		const [user, friendUser] = await Promise.all([
+			User.findById(userId),
+			User.findById(requestId)
+		]);
 
-		const requestIndex = user.friendRequests.findIndex(fr => fr.from && fr.from.toString() === requestId.toString());
-
-		if (requestIndex === -1) {
-			console.warn(`[FriendRequest] Request not found in user's list. User: ${userId}, RequestFrom: ${requestId}`);
-			// Check if already friends anyway
-			if (user.friends.some(f => f.toString() === requestId.toString())) {
-				return res.status(200).json({ message: "You are already friends." });
-			}
-			return res.status(404).json({ error: "Friend request not found." });
+		if (!user) {
+			console.error(`[FriendRequest] Authenticated user ${userId} not found in DB`);
+			return res.status(404).json({ error: "Authenticated user not found." });
 		}
-
-		// Add each other as friends if not already friends
-		if (!user.friends.some(f => f.toString() === requestId.toString())) {
-			user.friends.push(requestId);
-		}
-
-		// Remove the request
-		user.friendRequests.splice(requestIndex, 1);
-		await user.save();
-
-		const friendUser = await User.findById(requestId);
 		if (!friendUser) {
+			console.error(`[FriendRequest] Sender user ${requestId} not found in DB`);
 			return res.status(404).json({ error: "Sender user no longer exists." });
 		}
 
-		if (!friendUser.friends.some(f => f.toString() === userId.toString())) {
+		// Ensure arrays exist (defensive against corrupt/missing data)
+		if (!Array.isArray(user.friends)) user.friends = [];
+		if (!Array.isArray(friendUser.friends)) friendUser.friends = [];
+		if (!Array.isArray(user.friendRequests)) user.friendRequests = [];
+
+		const requestIdStr = requestId.toString();
+		const userIdStr = userId.toString();
+
+		// Check for existing request
+		const requestIndex = user.friendRequests.findIndex(fr => fr.from && fr.from.toString() === requestIdStr);
+
+		const alreadyFriendsInUser = user.friends.some(f => f && f.toString() === requestIdStr);
+		const alreadyFriendsInSender = friendUser.friends.some(f => f && f.toString() === userIdStr);
+
+		if (requestIndex === -1 && !alreadyFriendsInUser) {
+			console.warn(`[FriendRequest] No active request found for ${requestIdStr} in user ${userIdStr}`);
+			return res.status(404).json({ error: "Friend request not found or already processed." });
+		}
+
+		// Update logged-in user
+		let userModified = false;
+		if (!alreadyFriendsInUser) {
+			user.friends.push(requestId);
+			userModified = true;
+		}
+		if (requestIndex !== -1) {
+			user.friendRequests.splice(requestIndex, 1);
+			userModified = true;
+		}
+		if (userModified) {
+			await user.save();
+			console.log(`[FriendRequest] Updated user ${userIdStr} record`);
+		}
+
+		// Update sender
+		if (!alreadyFriendsInSender) {
 			friendUser.friends.push(userId);
 			await friendUser.save();
+			console.log(`[FriendRequest] Updated sender ${requestIdStr} record`);
 		}
 
-		// Socket notification for the other person
+		// Socket notification for the other person (non-critical)
 		try {
-			console.log(`[FriendRequest] Attempting socket notification to ${requestId}`);
 			const { getIO, getReceiverSocketIds } = await import("../lib/socket.js");
 			const io = getIO();
-			const friendSocketIds = getReceiverSocketIds(requestId);
-			friendSocketIds.forEach(socketId => {
-				io.to(socketId).emit("friendRequestAccepted", {
-					_id: user._id,
-					username: user.username,
-					tag: user.tag,
-					profilePic: user.profilePic
+			if (io) {
+				const friendSocketIds = getReceiverSocketIds(requestIdStr);
+				friendSocketIds.forEach(socketId => {
+					io.to(socketId).emit("friendRequestAccepted", {
+						_id: user._id,
+						username: user.username,
+						tag: user.tag,
+						profilePic: user.profilePic
+					});
 				});
-			});
+				console.log(`[FriendRequest] Socket notification sent to ${friendSocketIds.length} sockets`);
+			}
 		} catch (socketError) {
-			console.error("[FriendRequest] Socket notification failed:", socketError);
-			// We don't want to fail the whole friend request if just the socket notification fails
+			console.error("[FriendRequest] Socket notification skipped:", socketError.message);
 		}
 
-		console.log(`[FriendRequest] Successfully accepted request for ${userId}`);
-		res.status(200).json({ message: "Friend request accepted.", friend: { _id: friendUser._id, username: friendUser.username, tag: friendUser.tag, profilePic: friendUser.profilePic } });
+		res.status(200).json({
+			message: "Friend request accepted.",
+			friend: {
+				_id: friendUser._id,
+				username: friendUser.username,
+				tag: friendUser.tag,
+				profilePic: friendUser.profilePic
+			}
+		});
 	} catch (error) {
-		console.error("Error in acceptFriendRequest:", error);
-		res.status(500).json({ error: "Internal Server Error", details: error.message });
+		console.error("CRITICAL error in acceptFriendRequest:", error);
+		res.status(500).json({
+			error: "Internal Server Error",
+			details: error.message,
+			code: error.code || "UNKNOWN_ERROR"
+		});
 	}
 };
 
 export const rejectFriendRequest = async (req, res) => {
 	try {
 		const { requestId } = req.body;
+		if (!req.user || !req.user._id) {
+			return res.status(401).json({ error: "Unauthorized" });
+		}
 		const userId = req.user._id;
 
-		console.log(`[FriendRequest] Rejecting request from ${requestId} for user ${userId}`);
+		console.log(`[FriendRequest] Rejecting request. From: ${requestId}, To: ${userId}`);
 
 		if (!requestId || !mongoose.Types.ObjectId.isValid(requestId)) {
-			console.error(`[FriendRequest] Invalid requestId: ${requestId}`);
-			return res.status(400).json({ error: "Invalid request ID." });
+			console.error(`[FriendRequest] Invalid requestId format: ${requestId}`);
+			return res.status(400).json({ error: "Invalid request ID format." });
 		}
 
 		const user = await User.findById(userId);
-		if (!user) return res.status(404).json({ error: "User not found." });
+		if (!user) {
+			console.error(`[FriendRequest] Authenticated user ${userId} not found in DB`);
+			return res.status(404).json({ error: "User not found." });
+		}
 
+		if (!Array.isArray(user.friendRequests)) user.friendRequests = [];
+
+		const requestIdStr = requestId.toString();
 		const initialLength = user.friendRequests.length;
-		user.friendRequests = user.friendRequests.filter(fr => fr.from && fr.from.toString() !== requestId.toString());
+
+		user.friendRequests = user.friendRequests.filter(fr => fr.from && fr.from.toString() !== requestIdStr);
 
 		if (user.friendRequests.length === initialLength) {
-			console.warn(`[FriendRequest] No request found to reject. User: ${userId}, RequestFrom: ${requestId}`);
+			console.warn(`[FriendRequest] No request found to reject for ${requestIdStr} in user ${userId}`);
 		}
 
 		await user.save();
 
 		res.status(200).json({ message: "Friend request rejected." });
 	} catch (error) {
-		console.error("Error in rejectFriendRequest:", error);
-		res.status(500).json({ error: "Internal Server Error", details: error.message });
+		console.error("CRITICAL error in rejectFriendRequest:", error);
+		res.status(500).json({
+			error: "Internal Server Error",
+			details: error.message,
+			code: error.code || "UNKNOWN_ERROR"
+		});
 	}
 };
 
