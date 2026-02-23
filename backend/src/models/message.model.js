@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+import { encrypt, decrypt } from "../lib/encryption.js";
+
 const messageSchema = new mongoose.Schema(
   {
     senderId: {
@@ -14,6 +16,8 @@ const messageSchema = new mongoose.Schema(
     },
     text: {
       type: String,
+      set: (v) => encrypt(v),
+      get: (v) => decrypt(v),
     },
     image: {
       type: String,
@@ -27,7 +31,11 @@ const messageSchema = new mongoose.Schema(
       default: false,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: { getters: true },
+    toObject: { getters: true }
+  }
 );
 
 const Message = mongoose.model("Message", messageSchema);
