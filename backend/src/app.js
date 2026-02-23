@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from "dotenv";
 import path from "path";
+import passport from "./lib/passport.js";
 import passkeyRoutes from "./routes/passkey.route.js";
 
 // Route imports
@@ -19,6 +20,7 @@ const app = express();
 app.set('trust proxy', 1); // Trust Render's proxy
 app.use(express.json({ limit: "50mb" }));
 app.use(cookieParser());
+app.use(passport.initialize());
 
 
 const corsOptions = {

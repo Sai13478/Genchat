@@ -1,6 +1,9 @@
 import User from "../models/user.model.js";
+import RefreshToken from "../models/refresh-token.model.js";
 import bcrypt from "bcryptjs";
-import { generateToken } from "../lib/utils.js";
+import passport from "passport";
+import jwt from "jsonwebtoken";
+import { generateTokens, clearTokens } from "../lib/utils.js";
 import cloudinary from "../lib/cloudinary.js";
 
 // Helper function to generate a unique tag for a username
@@ -32,20 +35,16 @@ export const signup = async (req, res) => {
 			return res.status(400).json({ error: "Passwords don't match" });
 		}
 
-		// Check if email already exists
 		const existingEmail = await User.findOne({ email });
 		if (existingEmail) {
 			return res.status(409).json({ error: "Email already exists" });
 		}
 
-		// Generate unique tag for the username
 		const tag = await generateUniqueTag(username);
-
 		if (!tag) {
-			return res.status(500).json({ error: "Could not generate a unique tag for this username. Please try another username." });
+			return res.status(500).json({ error: "Could not generate a unique tag." });
 		}
 
-		// HASH PASSWORD
 		const salt = await bcrypt.genSalt(10);
 		const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -58,82 +57,83 @@ export const signup = async (req, res) => {
 
 		await newUser.save();
 
-		// Generate JWT token and set cookie
-		const token = generateToken(newUser._id, res);
+		const deviceInfo = req.headers["user-agent"] || "unknown";
+		const { accessToken } = await generateTokens(newUser._id, res, deviceInfo);
 
-		// Return user data without the password
 		res.status(201).json({
 			_id: newUser._id,
 			username: newUser.username,
 			tag: newUser.tag,
 			email: newUser.email,
 			profilePic: newUser.profilePic,
-			token, // Included for localStorage fallback
+			token: accessToken,
 		});
 	} catch (error) {
-		// Log the full error for better debugging on the server
 		console.error("Error in signup controller:", error);
-
-		// Handle specific MongoDB duplicate key error
-		if (error.code === 11000) {
-			const field = Object.keys(error.keyPattern)[0];
-			return res.status(409).json({ error: `An account with that ${field} already exists.` });
-		}
-
-		// Generic internal server error for all other cases
 		res.status(500).json({ error: "Internal Server Error" });
 	}
 };
 
-export const login = async (req, res) => {
+export const login = (req, res, next) => {
+	passport.authenticate("local", { session: false }, async (err, user, info) => {
+		if (err) return next(err);
+		if (!user) return res.status(400).json({ error: info.message || "Invalid credentials" });
+
+		try {
+			const deviceInfo = req.headers["user-agent"] || "unknown";
+			const { accessToken } = await generateTokens(user._id, res, deviceInfo);
+
+			res.status(200).json({
+				_id: user._id,
+				username: user.username,
+				tag: user.tag,
+				email: user.email,
+				profilePic: user.profilePic,
+				token: accessToken,
+			});
+		} catch (error) {
+			console.error("Error in login controller:", error);
+			res.status(500).json({ error: "Internal Server Error" });
+		}
+	})(req, res, next);
+};
+
+export const refreshToken = async (req, res) => {
 	try {
-		const { email, password } = req.body;
-		const user = await User.findOne({ email });
-		if (!user) {
-			return res.status(400).json({ error: "Invalid credentials" });
+		const token = req.cookies.refreshToken;
+		if (!token) return res.status(401).json({ error: "Refresh Token required" });
+
+		const payload = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+		const storedToken = await RefreshToken.findOne({ token, user: payload.userId });
+
+		if (!storedToken) {
+			// Potential token reuse/leak? Revoke all tokens for this user for safety
+			await RefreshToken.deleteMany({ user: payload.userId });
+			clearTokens(res);
+			return res.status(403).json({ error: "Token reuse detected. All sessions revoked." });
 		}
 
-		const isPasswordCorrect = await bcrypt.compare(password, user.password);
+		// Rotate token: Delete old one, create new one
+		await RefreshToken.findByIdAndDelete(storedToken._id);
 
-		if (!isPasswordCorrect) {
-			return res.status(400).json({ error: "Invalid credentials" });
-		}
+		const deviceInfo = req.headers["user-agent"] || "unknown";
+		const { accessToken } = await generateTokens(payload.userId, res, deviceInfo);
 
-		// Legacy Migration: Generate username/tag if missing
-		let modified = false;
-		if (!user.username) {
-			user.username = user.email.split("@")[0] || "User";
-			modified = true;
-		}
-		if (!user.tag) {
-			const tag = await generateUniqueTag(user.username);
-			user.tag = tag || "0000";
-			modified = true;
-		}
-
-		if (modified) {
-			await user.save();
-		}
-
-		const token = generateToken(user._id, res);
-
-		res.status(200).json({
-			_id: user._id,
-			username: user.username,
-			tag: user.tag,
-			email: user.email,
-			profilePic: user.profilePic,
-			token, // Included for localStorage fallback
-		});
+		res.status(200).json({ token: accessToken });
 	} catch (error) {
-		console.error("Error in login controller:", error);
-		res.status(500).json({ error: "Internal Server Error" });
+		console.error("Error in refreshToken controller:", error);
+		clearTokens(res);
+		res.status(401).json({ error: "Invalid or expired refresh token" });
 	}
 };
 
-export const logout = (req, res) => {
+export const logout = async (req, res) => {
 	try {
-		res.cookie("jwt", "", { maxAge: 0 });
+		const token = req.cookies.refreshToken;
+		if (token) {
+			await RefreshToken.deleteOne({ token });
+		}
+		clearTokens(res);
 		res.status(200).json({ message: "Logged out successfully" });
 	} catch (error) {
 		console.error("Error in logout controller:", error);
@@ -141,32 +141,24 @@ export const logout = (req, res) => {
 	}
 };
 
+export const logoutAllDevices = async (req, res) => {
+	try {
+		await RefreshToken.deleteMany({ user: req.user._id });
+		clearTokens(res);
+		res.status(200).json({ message: "Logged out from all devices" });
+	} catch (error) {
+		console.error("Error in logoutAllDevices controller:", error);
+		res.status(500).json({ error: "Internal Server Error" });
+	}
+};
+
 export const checkAuth = async (req, res) => {
 	try {
-		// req.user is attached by the protectRoute middleware
 		const user = await User.findById(req.user._id).select("-password");
 		if (!user) {
-			// Clear the stale cookie so the browser stops retrying
-			res.cookie("jwt", "", { maxAge: 0 });
-			return res.status(401).json({ error: "Session expired. Please log in again." });
+			clearTokens(res);
+			return res.status(401).json({ error: "Session expired." });
 		}
-
-		// Legacy Migration: Generate username/tag if missing
-		let modified = false;
-		if (!user.username) {
-			user.username = user.email.split("@")[0] || "User";
-			modified = true;
-		}
-		if (!user.tag) {
-			const tag = await generateUniqueTag(user.username);
-			user.tag = tag || "0000";
-			modified = true;
-		}
-
-		if (modified) {
-			await user.save();
-		}
-
 		res.status(200).json(user);
 	} catch (error) {
 		console.error("Error in checkAuth controller:", error);
@@ -177,21 +169,16 @@ export const checkAuth = async (req, res) => {
 export const updateProfile = async (req, res) => {
 	try {
 		const { profilePic } = req.body;
-		const userId = req.user._id; // From protectRoute middleware
+		const userId = req.user._id;
 
 		const user = await User.findById(userId);
-		if (!user) {
-			return res.status(404).json({ error: "User not found" });
-		}
+		if (!user) return res.status(404).json({ error: "User not found" });
 
-		// If user already has a profile pic, delete the old one from Cloudinary
 		if (user.profilePic) {
-			// Extract public_id from the URL
 			const publicId = user.profilePic.split("/").pop().split(".")[0];
 			await cloudinary.uploader.destroy(`profile_pics/${publicId}`);
 		}
 
-		// Upload the new image to Cloudinary
 		const uploadedResponse = await cloudinary.uploader.upload(profilePic, {
 			folder: "profile_pics",
 			width: 250,
@@ -202,7 +189,6 @@ export const updateProfile = async (req, res) => {
 		user.profilePic = uploadedResponse.secure_url;
 		await user.save();
 
-		// Return a consistent user object
 		const userResponse = { _id: user._id, username: user.username, tag: user.tag, email: user.email, profilePic: user.profilePic };
 		res.status(200).json({ message: "Profile updated successfully", user: userResponse });
 	} catch (error) {

@@ -1,14 +1,12 @@
 import axios from "axios";
 
 const getBaseURL = () => {
-	// In production, we use the environment variable
 	if (import.meta.env.PROD) {
 		const envUrl = import.meta.env.VITE_API_URL;
 		if (envUrl && envUrl !== "undefined" && envUrl.startsWith("http")) {
 			return `${envUrl}/api`;
 		}
 	}
-	// In development, use relative path for Vite proxy
 	return "/api";
 };
 
@@ -32,24 +30,47 @@ apiClient.interceptors.request.use(
 	}
 );
 
-// Global interceptor: if any request returns 401, clear auth state silently.
+// Response interceptor: handle 401 with silent token refresh
 apiClient.interceptors.response.use(
 	(response) => response,
-	(error) => {
-		// Only clear if it's a 401 and we actually had a user (to avoid loops or clearing on initial check)
-		if (error.response?.status === 401) {
-			const token = localStorage.getItem("genchat-token");
-			if (token) {
+	async (error) => {
+		const originalRequest = error.config;
+
+		// If error is 401 and we haven't retried yet and it's not a login/signup/refresh request itself
+		const isAuthRequest = originalRequest.url.includes("/auth/login") ||
+			originalRequest.url.includes("/auth/signup") ||
+			originalRequest.url.includes("/auth/refresh");
+
+		if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
+			originalRequest._retry = true;
+
+			try {
+				// Call refresh endpoint directly using axios to avoiding interceptor loop
+				const res = await axios.post(
+					`${apiClient.defaults.baseURL}/auth/refresh`,
+					{},
+					{ withCredentials: true }
+				);
+
+				const { token } = res.data;
+				localStorage.setItem("genchat-token", token);
+
+				// Update Authorization header and retry original request
+				originalRequest.headers.Authorization = `Bearer ${token}`;
+				return apiClient(originalRequest);
+			} catch (refreshError) {
+				console.error("Session expired. Please log in again.");
+
+				// Clear auth state
 				localStorage.removeItem("genchat-token");
-				// Dynamically import to avoid circular dependency
+				// Dynamically import useAuthStore to avoid circular dependencies
 				import("../store/useAuthStore.js").then(({ useAuthStore }) => {
-					const { authUser } = useAuthStore.getState();
-					if (authUser) {
-						useAuthStore.setState({ authUser: null });
-					}
+					useAuthStore.setState({ authUser: null });
 				});
+				return Promise.reject(refreshError);
 			}
 		}
+
 		return Promise.reject(error);
 	}
 );

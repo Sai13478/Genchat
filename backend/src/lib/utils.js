@@ -1,42 +1,70 @@
 import jwt from "jsonwebtoken";
+import RefreshToken from "../models/refresh-token.model.js";
 
-export const generateToken = (userId, res) => {
-  if (!process.env.JWT_SECRET) {
-    console.error('JWT_SECRET is not set in environment variables');
+export const generateTokens = async (userId, res, deviceInfo = "unknown") => {
+  if (!process.env.JWT_SECRET || !process.env.REFRESH_TOKEN_SECRET) {
+    console.error('JWT secrets are not set in environment variables');
     throw new Error('Server configuration error');
   }
 
-  // Generate JWT token
-  const token = jwt.sign(
+  // Generate Access Token (Short-lived)
+  const accessToken = jwt.sign(
     { userId },
     process.env.JWT_SECRET,
+    { expiresIn: '15m' }
+  );
+
+  // Generate Refresh Token (Long-lived)
+  const refreshToken = jwt.sign(
+    { userId },
+    process.env.REFRESH_TOKEN_SECRET,
     { expiresIn: '7d' }
   );
 
-  // Set cookie with secure defaults
+  // Store Refresh Token in DB
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
+
+  await RefreshToken.create({
+    user: userId,
+    token: refreshToken,
+    deviceInfo,
+    expiresAt
+  });
+
+  // Set cookies with secure defaults
   const cookieOptions = {
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
   };
 
-  // Set the cookie
-  res.cookie("jwt", token, cookieOptions);
+  res.cookie("accessToken", accessToken, {
+    ...cookieOptions,
+    maxAge: 15 * 60 * 1000, // 15 minutes
+  });
 
-  // Also set the token in the response header for API clients
-  res.setHeader("Authorization", `Bearer ${token}`);
+  res.cookie("refreshToken", refreshToken, {
+    ...cookieOptions,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  });
 
-  return token;
+  // Also set the accessToken in the response header for API clients
+  res.setHeader("Authorization", `Bearer ${accessToken}`);
+
+  return { accessToken, refreshToken };
 };
 
-// Helper to clear the JWT cookie
-export const clearToken = (res) => {
-  res.clearCookie("jwt", {
+// Helper to clear all auth cookies
+export const clearTokens = (res) => {
+  const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-  });
+  };
+  res.clearCookie("accessToken", cookieOptions);
+  res.clearCookie("refreshToken", cookieOptions);
+  res.clearCookie("jwt", cookieOptions); // Clear legacy cookie
 };
