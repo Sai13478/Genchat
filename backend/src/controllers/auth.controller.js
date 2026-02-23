@@ -1,3 +1,8 @@
+import User from "../models/user.model.js";
+import bcrypt from "bcryptjs";
+import { generateToken } from "../lib/utils.js";
+import cloudinary from "../lib/cloudinary.js";
+
 // Helper function to generate a unique tag for a username
 const generateUniqueTag = async (username) => {
 	let tag;
