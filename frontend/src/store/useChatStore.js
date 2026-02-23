@@ -24,7 +24,7 @@ export const useChatStore = create((set, get) => ({
 
   searchUser: async (query) => {
     try {
-      const res = await apiClient.get(`/messages/search/${query}`);
+      const res = await apiClient.get(`/messages/search/${encodeURIComponent(query)}`);
       return res.data;
     } catch (error) {
       toast.error(error.response?.data?.error || "User not found");

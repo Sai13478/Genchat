@@ -33,8 +33,8 @@ export const getUsersForSidebar = async (req, res) => {
 			const idA = a._id?.toString();
 			const idB = b._id?.toString();
 
-			const indexA = iteratedUserIds.indexOf(idA);
-			const indexB = iteratedUserIds.indexOf(idB);
+			const indexA = interactedUserIds.indexOf(idA);
+			const indexB = interactedUserIds.indexOf(idB);
 
 			if (indexA !== -1 && indexB !== -1) return indexA - indexB;
 			if (indexA !== -1) return -1;
