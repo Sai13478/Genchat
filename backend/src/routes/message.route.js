@@ -1,5 +1,14 @@
 import express from "express";
-import { getUsersForSidebar, sendMessage, getMessages, searchUser, addFriend } from "../controllers/message.controller.js";
+import {
+    getUsersForSidebar,
+    sendMessage,
+    getMessages,
+    searchUser,
+    sendFriendRequest,
+    getFriendRequests,
+    acceptFriendRequest,
+    rejectFriendRequest
+} from "../controllers/message.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 
 const router = express.Router();

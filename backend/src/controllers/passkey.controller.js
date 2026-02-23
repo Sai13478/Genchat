@@ -6,7 +6,9 @@ import {
 	verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
 import base64url from "base64url";
-import { generateToken } from "../lib/utils.js";
+import { generateTokens } from "../lib/utils.js";
+
+const rpName = "Genchat";
 
 // Use host from request if RP_ID is not set
 const getRpID = (req) => {
@@ -172,7 +174,7 @@ export const verifyLogin = async (req, res) => {
 			await user.save();
 
 			// Generate token and log the user in
-			generateToken(user._id, res);
+			await generateTokens(user._id, res);
 
 			res.status(200).json({
 				_id: user._id,
