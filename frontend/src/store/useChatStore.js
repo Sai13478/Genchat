@@ -6,6 +6,7 @@ export const useChatStore = create((set, get) => ({
   users: [],
   selectedUser: null,
   messages: [],
+  friendRequests: [],
   isUsersLoading: false,
   isMessagesLoading: false,
   isTyping: false,
@@ -32,13 +33,47 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  addFriend: async (friendId) => {
+  sendFriendRequest: async (targetId) => {
     try {
-      const res = await apiClient.post("/messages/add-friend", { friendId });
+      const res = await apiClient.post(`/messages/friend-request/${targetId}`);
       toast.success(res.data.message);
-      set({ users: [res.data.friend, ...get().users] });
     } catch (error) {
-      toast.error(error.response?.data?.error || "Failed to add friend");
+      toast.error(error.response?.data?.error || "Failed to send request");
+    }
+  },
+
+  getFriendRequests: async () => {
+    try {
+      const res = await apiClient.get("/messages/friend-requests");
+      set({ friendRequests: res.data });
+    } catch (error) {
+      console.error("Failed to load friend requests:", error);
+    }
+  },
+
+  acceptFriendRequest: async (requestId) => {
+    try {
+      const res = await apiClient.post("/messages/friend-request/accept", { requestId });
+      toast.success(res.data.message);
+      // Remove from requests and add to users
+      set({
+        friendRequests: get().friendRequests.filter(req => req.from._id !== requestId),
+        users: [res.data.friend, ...get().users]
+      });
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to accept request");
+    }
+  },
+
+  rejectFriendRequest: async (requestId) => {
+    try {
+      const res = await apiClient.post("/messages/friend-request/reject", { requestId });
+      toast.success(res.data.message);
+      set({
+        friendRequests: get().friendRequests.filter(req => req.from._id !== requestId)
+      });
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to reject request");
     }
   },
 
@@ -112,13 +147,27 @@ export const useChatStore = create((set, get) => ({
       });
       set({ messages: updatedMessages });
     });
+
+    // Social Events
+    socket.on("friendRequestReceived", (newRequest) => {
+      set({ friendRequests: [newRequest, ...get().friendRequests] });
+      toast.success(`${newRequest.from.username} sent you a friend request!`);
+    });
+
+    socket.on("friendRequestAccepted", (newFriend) => {
+      set({ users: [newFriend, ...get().users] });
+      toast.success(`${newFriend.username} accepted your friend request!`);
+    });
   },
 
   unsubscribeFromMessages: () => {
     const socket = useAuthStore.getState().socket;
+    if (!socket) return;
     socket.off("newMessage");
     socket.off("messagesDelivered");
     socket.off("messagesSeen");
+    socket.off("friendRequestReceived");
+    socket.off("friendRequestAccepted");
   },
 
   setSelectedUser: (selectedUser) => set({ selectedUser, messages: [] }),

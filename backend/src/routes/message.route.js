@@ -7,7 +7,10 @@ const router = express.Router();
 // This route MUST be protected to know who the current user is
 router.get("/users", protectRoute, getUsersForSidebar);
 router.get("/search", protectRoute, searchUser);
-router.post("/add-friend", protectRoute, addFriend);
+router.post("/friend-request/:id", protectRoute, sendFriendRequest);
+router.get("/friend-requests", protectRoute, getFriendRequests);
+router.post("/friend-request/accept", protectRoute, acceptFriendRequest);
+router.post("/friend-request/reject", protectRoute, rejectFriendRequest);
 router.get("/:id", protectRoute, getMessages);
 
 router.post("/send/:id", protectRoute, sendMessage);

@@ -1,7 +1,7 @@
 import User from "../models/user.model.js";
 import Conversation from "../models/conversation.model.js";
 import Message from "../models/message.model.js";
-import { io } from "../lib/socket.js";
+import { getIO, getReceiverSocketIds } from "../lib/socket.js";
 
 export const getUsersForSidebar = async (req, res) => {
 	try {
@@ -87,35 +87,128 @@ export const searchUser = async (req, res) => {
 	}
 };
 
-export const addFriend = async (req, res) => {
+export const sendFriendRequest = async (req, res) => {
 	try {
-		const { friendId } = req.body;
-		const loggedInUserId = req.user._id;
+		const { id: targetId } = req.params;
+		const senderId = req.user._id;
 
-		if (friendId === loggedInUserId.toString()) {
-			return res.status(400).json({ error: "You cannot add yourself as a friend" });
+		if (senderId.toString() === targetId) {
+			return res.status(400).json({ error: "You cannot send a friend request to yourself." });
 		}
 
-		const user = await User.findById(loggedInUserId);
-		const friend = await User.findById(friendId);
+		const targetUser = await User.findById(targetId);
+		const senderUser = await User.findById(senderId);
 
-		if (!friend) {
-			return res.status(404).json({ error: "Friend user not found" });
+		if (!targetUser) {
+			return res.status(404).json({ error: "User not found." });
 		}
 
-		if (user.friends.some(id => id.toString() === friendId)) {
-			return res.status(400).json({ error: "User is already your friend" });
+		// Check if already friends
+		if (senderUser.friends.includes(targetId)) {
+			return res.status(400).json({ error: "You are already friends." });
 		}
 
-		user.friends.push(friendId);
-		friend.friends.push(loggedInUserId);
+		// Check if request already sent
+		const alreadyRequested = targetUser.friendRequests.some(req => req.from.toString() === senderId.toString());
+		if (alreadyRequested) {
+			return res.status(400).json({ error: "Friend request already sent." });
+		}
 
-		await Promise.all([user.save(), friend.save()]);
+		// Check if they already sent YOU a request
+		const sentMeRequest = senderUser.friendRequests.some(req => req.from.toString() === targetId);
+		if (sentMeRequest) {
+			return res.status(400).json({ error: "This user has already sent you a request. Check your requests!" });
+		}
 
-		res.status(200).json({ message: "Friend added successfully", friend: { _id: friend._id, username: friend.username, tag: friend.tag, profilePic: friend.profilePic } });
+		targetUser.friendRequests.push({ from: senderId });
+		await targetUser.save();
+
+		// Real-time notification
+		const io = getIO();
+		const receiverSocketIds = getReceiverSocketIds(targetId);
+		receiverSocketIds.forEach(socketId => {
+			io.to(socketId).emit("friendRequestReceived", {
+				from: {
+					_id: senderUser._id,
+					username: senderUser.username,
+					tag: senderUser.tag,
+					profilePic: senderUser.profilePic
+				},
+				createdAt: new Date()
+			});
+		});
+
+		res.status(200).json({ message: "Friend request sent successfully." });
 	} catch (error) {
-		console.error("Error in addFriend: ", error);
-		res.status(500).json({ error: "Internal server error" });
+		console.error("Error in sendFriendRequest:", error);
+		res.status(500).json({ error: "Internal Server Error" });
+	}
+};
+
+export const getFriendRequests = async (req, res) => {
+	try {
+		const userId = req.user._id;
+		const user = await User.findById(userId).populate("friendRequests.from", "username tag profilePic _id");
+		res.status(200).json(user.friendRequests || []);
+	} catch (error) {
+		console.error("Error in getFriendRequests:", error);
+		res.status(500).json({ error: "Internal Server Error" });
+	}
+};
+
+export const acceptFriendRequest = async (req, res) => {
+	try {
+		const { requestId } = req.body;
+		const userId = req.user._id;
+
+		const user = await User.findById(userId);
+		const request = user.friendRequests.find(req => req.from.toString() === requestId);
+
+		if (!request) {
+			return res.status(404).json({ error: "Friend request not found." });
+		}
+
+		// Add each other as friends
+		user.friends.push(requestId);
+		user.friendRequests = user.friendRequests.filter(req => req.from.toString() !== requestId);
+		await user.save();
+
+		const friendUser = await User.findById(requestId);
+		friendUser.friends.push(userId);
+		await friendUser.save();
+
+		// Socket notification for the other person
+		const io = getIO();
+		const friendSocketIds = getReceiverSocketIds(requestId);
+		friendSocketIds.forEach(socketId => {
+			io.to(socketId).emit("friendRequestAccepted", {
+				_id: user._id,
+				username: user.username,
+				tag: user.tag,
+				profilePic: user.profilePic
+			});
+		});
+
+		res.status(200).json({ message: "Friend request accepted.", friend: { _id: friendUser._id, username: friendUser.username, tag: friendUser.tag, profilePic: friendUser.profilePic } });
+	} catch (error) {
+		console.error("Error in acceptFriendRequest:", error);
+		res.status(500).json({ error: "Internal Server Error" });
+	}
+};
+
+export const rejectFriendRequest = async (req, res) => {
+	try {
+		const { requestId } = req.body;
+		const userId = req.user._id;
+
+		const user = await User.findById(userId);
+		user.friendRequests = user.friendRequests.filter(req => req.from.toString() !== requestId);
+		await user.save();
+
+		res.status(200).json({ message: "Friend request rejected." });
+	} catch (error) {
+		console.error("Error in rejectFriendRequest:", error);
+		res.status(500).json({ error: "Internal Server Error" });
 	}
 };
 
@@ -158,6 +251,7 @@ export const sendMessage = async (req, res) => {
 		await Promise.all([conversation.save(), newMessage.save()]);
 
 		// SOCKET.IO - Emit the event to the receiver's room
+		const io = getIO();
 		io.to(receiverId).emit("newMessage", newMessage);
 
 		res.status(201).json(newMessage);

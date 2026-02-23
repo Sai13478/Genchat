@@ -208,4 +208,11 @@ io.on("connection", (socket) => {
 
 });
 
-export { server, io, getReceiverSocketIds };
+const getIO = () => {
+  if (!io) {
+    throw new Error("Socket.io not initialized!");
+  }
+  return io;
+};
+
+export { server, io, getReceiverSocketIds, getIO };

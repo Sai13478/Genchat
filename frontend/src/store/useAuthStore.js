@@ -12,12 +12,15 @@ export const useAuthStore = create((set, get) => ({
   checkAuth: async () => {
     set({ isCheckingAuth: true });
     try {
-      const res = await apiClient.get("/auth/check");
+      // Prioritize the token from localStorage if present
+      const token = localStorage.getItem("genchat-token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const res = await apiClient.get("/auth/check", { headers });
       set({ authUser: res.data });
     } catch (error) {
-      // 401 and 404 are expected when the user is not logged in or session expired.
-      // Silently set authUser to null — the app will redirect to login.
       set({ authUser: null });
+      localStorage.removeItem("genchat-token");
     } finally {
       set({ isCheckingAuth: false });
     }
@@ -27,6 +30,7 @@ export const useAuthStore = create((set, get) => ({
     set({ isSigningUp: true });
     try {
       const res = await apiClient.post("/auth/signup", data);
+      localStorage.setItem("genchat-token", res.data.token);
       set({ authUser: res.data });
       toast.success("Account created successfully");
     } catch (error) {
@@ -40,6 +44,7 @@ export const useAuthStore = create((set, get) => ({
     set({ isLoggingIn: true });
     try {
       const res = await apiClient.post("/auth/login", data);
+      localStorage.setItem("genchat-token", res.data.token);
       set({ authUser: res.data });
       toast.success("Logged in successfully");
     } catch (error) {
@@ -52,6 +57,7 @@ export const useAuthStore = create((set, get) => ({
   logout: async () => {
     try {
       await apiClient.post("/auth/logout");
+      localStorage.removeItem("genchat-token");
       set({ authUser: null });
       toast.success("Logged out successfully");
     } catch (error) {

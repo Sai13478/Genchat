@@ -59,7 +59,7 @@ export const signup = async (req, res) => {
 		await newUser.save();
 
 		// Generate JWT token and set cookie
-		generateToken(newUser._id, res);
+		const token = generateToken(newUser._id, res);
 
 		// Return user data without the password
 		res.status(201).json({
@@ -68,6 +68,7 @@ export const signup = async (req, res) => {
 			tag: newUser.tag,
 			email: newUser.email,
 			profilePic: newUser.profilePic,
+			token, // Included for localStorage fallback
 		});
 	} catch (error) {
 		// Log the full error for better debugging on the server
@@ -114,7 +115,7 @@ export const login = async (req, res) => {
 			await user.save();
 		}
 
-		generateToken(user._id, res);
+		const token = generateToken(user._id, res);
 
 		res.status(200).json({
 			_id: user._id,
@@ -122,6 +123,7 @@ export const login = async (req, res) => {
 			tag: user.tag,
 			email: user.email,
 			profilePic: user.profilePic,
+			token, // Included for localStorage fallback
 		});
 	} catch (error) {
 		console.error("Error in login controller:", error);

@@ -18,17 +18,30 @@ const apiClient = axios.create({
 	headers: { "Content-Type": "application/json" },
 });
 
+// Request interceptor: add Bearer token from localStorage to every request
+apiClient.interceptors.request.use(
+	(config) => {
+		const token = localStorage.getItem("genchat-token");
+		if (token) {
+			config.headers.Authorization = `Bearer ${token}`;
+		}
+		return config;
+	},
+	(error) => {
+		return Promise.reject(error);
+	}
+);
+
 // Global interceptor: if any request returns 401, clear auth state silently.
-// This handles mid-session token expiry without error popups.
 apiClient.interceptors.response.use(
 	(response) => response,
 	(error) => {
 		if (error.response?.status === 401) {
+			localStorage.removeItem("genchat-token");
 			// Dynamically import to avoid circular dependency
 			import("../store/useAuthStore.js").then(({ useAuthStore }) => {
 				const { authUser } = useAuthStore.getState();
 				if (authUser) {
-					// Only reset if user was previously logged in (session expired mid-use)
 					useAuthStore.setState({ authUser: null });
 				}
 			});

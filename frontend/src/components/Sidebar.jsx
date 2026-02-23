@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 const Sidebar = () => {
     const { authUser } = useAuthStore();
     const { onlineUsers } = useSocket();
-    const { users, getUsers, isUsersLoading, searchUser, addFriend } = useChatStore();
+    const { users, getUsers, isUsersLoading, searchUser, sendFriendRequest, friendRequests, acceptFriendRequest, rejectFriendRequest } = useChatStore();
     const [usernameQuery, setUsernameQuery] = useState("");
     const [tagQuery, setTagQuery] = useState("");
     const [searchResult, setSearchResult] = useState(null);
@@ -37,9 +37,9 @@ const Sidebar = () => {
         setIsSearching(false);
     };
 
-    const handleAddFriend = async () => {
+    const handleSendRequest = async () => {
         if (searchResult) {
-            await addFriend(searchResult._id);
+            await sendFriendRequest(searchResult._id);
             setSearchResult(null);
             setUsernameQuery("");
             setTagQuery("");
@@ -85,7 +85,7 @@ const Sidebar = () => {
 
             {/* Search Result */}
             {searchResult && (
-                <div className="bg-base-200 p-3 rounded-lg mb-4 animate-in fade-in slide-in-from-top-2">
+                <div className="bg-base-200 p-3 rounded-lg mb-4 animate-in fade-in slide-in-from-top-2 border border-primary/20">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <img src={searchResult.profilePic || "/avatar.png"} alt="avatar" className="size-8 rounded-full border" />
@@ -93,7 +93,28 @@ const Sidebar = () => {
                                 <p className="font-bold">{searchResult.username}#<span className="opacity-50">{searchResult.tag}</span></p>
                             </div>
                         </div>
-                        <button onClick={handleAddFriend} className="btn btn-xs btn-primary">Add</button>
+                        <button onClick={handleSendRequest} className="btn btn-xs btn-primary">Send Request</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Friend Requests */}
+            {friendRequests.length > 0 && (
+                <div className="mb-4">
+                    <p className="text-xs font-semibold opacity-50 mb-2 px-1 uppercase tracking-wider">Friend Requests ({friendRequests.length})</p>
+                    <div className="space-y-2 max-h-40 overflow-auto pr-1">
+                        {friendRequests.map((req) => (
+                            <div key={req._id} className="bg-base-200 p-2 rounded-lg flex items-center justify-between border border-primary/10">
+                                <div className="flex items-center gap-2">
+                                    <img src={req.from.profilePic || "/avatar.png"} alt="avatar" className="size-6 rounded-full border" />
+                                    <p className="text-xs font-medium truncate max-w-[80px]">{req.from.username}</p>
+                                </div>
+                                <div className="flex gap-1">
+                                    <button onClick={() => acceptFriendRequest(req.from._id)} className="btn btn-[10px] h-6 min-h-6 btn-success px-2">Accept</button>
+                                    <button onClick={() => rejectFriendRequest(req.from._id)} className="btn btn-[10px] h-6 min-h-6 btn-ghost px-2 bg-base-300">Reject</button>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}

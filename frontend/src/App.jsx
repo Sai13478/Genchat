@@ -23,6 +23,7 @@ import useListenMessages from "./hooks/useListenMessages";
 
 function App() {
     const { authUser, isCheckingAuth, checkAuth } = useAuthStore();
+    const { getFriendRequests, subscribeToMessages, unsubscribeFromMessages } = useChatStore();
     const { socket } = useSocket();
     const { theme } = useThemeStore();
     const navigate = useNavigate();
@@ -37,6 +38,14 @@ function App() {
     useEffect(() => {
         checkAuth();
     }, [checkAuth]);
+
+    useEffect(() => {
+        if (authUser) {
+            getFriendRequests();
+            subscribeToMessages();
+            return () => unsubscribeFromMessages();
+        }
+    }, [authUser, getFriendRequests, subscribeToMessages, unsubscribeFromMessages]);
 
     // Effect for handling standard call signaling (incoming, offline, declined)
     useEffect(() => {

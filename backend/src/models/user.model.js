@@ -37,6 +37,19 @@ const userSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    friendRequests: [
+      {
+        from: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
     // For WebAuthn
     authenticators: [authenticatorSchema],
     currentChallenge: { type: String },
