@@ -56,7 +56,10 @@ const ChatHeader = () => {
                     </div>
                 </div>
                 <div className='flex flex-col'>
-                    <p className='font-bold text-gray-200'>{selectedUser.fullName}</p>
+                    <p className='font-bold text-gray-200'>
+                        {selectedUser.username}
+                        <span className="text-xs opacity-50 ml-1">#{selectedUser.tag}</span>
+                    </p>
                     <span className='text-xs text-gray-400'>{isTyping ? "typing..." : isOnline ? "Online" : "Offline"}</span>
                 </div>
             </div>

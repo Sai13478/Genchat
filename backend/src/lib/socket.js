@@ -32,8 +32,8 @@ const getReceiverSocketIds = (userId) => userSocketMap.get(userId) || new Set();
 const emitCallLogUpdate = async (logId) => {
   try {
     const populatedLog = await CallLog.findById(logId)
-      .populate("caller", "fullName profilePic _id")
-      .populate("callee", "fullName profilePic _id")
+      .populate("caller", "username tag profilePic _id")
+      .populate("callee", "username tag profilePic _id")
       .lean();
 
     if (!populatedLog) return;
@@ -88,7 +88,7 @@ io.on("connection", (socket) => {
     if (userSocketMap.has(to)) {
       try {
         console.log(`[${new Date().toISOString()}] Relaying call from ${userId} to ${to}`);
-        const callerUser = await User.findById(userId).select("fullName profilePic _id");
+        const callerUser = await User.findById(userId).select("username tag profilePic _id");
 
         const newLog = new CallLog({ caller: userId, callee: to, callType, status: 'missed' });
         await newLog.save();

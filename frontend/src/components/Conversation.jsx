@@ -19,7 +19,10 @@ const Conversation = ({ conversation, isOnline }) => {
 				</div>
 
 				<div className='flex flex-col flex-1'>
-					<p className='font-bold text-gray-200'>{conversation.fullName}</p>
+					<p className='font-bold text-gray-200'>
+						{conversation.username}
+						<span className='text-xs opacity-50 ml-1'>#{conversation.tag}</span>
+					</p>
 				</div>
 			</div>
 			<div className='divider my-0 py-0 h-1' />

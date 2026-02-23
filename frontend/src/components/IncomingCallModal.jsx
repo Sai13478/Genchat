@@ -58,7 +58,10 @@ const IncomingCallModal = () => {
                     </div>
 
                     <div className="text-center space-y-2">
-                        <h2 className='text-3xl font-bold tracking-tight'>{from.fullName}</h2>
+                        <h2 className='text-3xl font-bold tracking-tight'>
+                            {from.username}
+                            <span className="text-lg opacity-50 ml-1">#{from.tag}</span>
+                        </h2>
                         <p className='text-emerald-400 font-medium animate-pulse'>Incoming {callType} call...</p>
                     </div>
                 </div>

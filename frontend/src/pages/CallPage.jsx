@@ -91,7 +91,10 @@ const CallPage = () => {
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="text-sm font-medium uppercase tracking-[0.2em]">End-to-end encrypted</span>
                 </div>
-                <h1 className="text-3xl font-bold leading-tight">{callee?.fullName || caller?.fullName}</h1>
+                <h1 className="text-3xl font-bold leading-tight">
+                    {(callee?.username || caller?.username) || "User"}
+                    <span className="text-lg opacity-50 ml-1">#{(callee?.tag || caller?.tag) || "0000"}</span>
+                </h1>
 
                 {callState === "connected" ? (
                     <div className='text-xl font-mono tracking-wider text-emerald-400'>

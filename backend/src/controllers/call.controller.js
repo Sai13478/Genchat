@@ -6,8 +6,8 @@ export const getCallLogs = async (req, res) => {
 		const logs = await CallLog.find({
 			$or: [{ caller: userId }, { callee: userId }],
 		})
-			.populate("caller", "fullName profilePic")
-			.populate("callee", "fullName profilePic")
+			.populate("caller", "username tag profilePic")
+			.populate("callee", "username tag profilePic")
 			.sort({ createdAt: -1 });
 
 		res.status(200).json(logs);

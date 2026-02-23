@@ -13,12 +13,32 @@ export const useChatStore = create((set, get) => ({
   getUsers: async () => {
     set({ isUsersLoading: true });
     try {
-      const res = await apiClient.get("/messages/conversations");
+      const res = await apiClient.get("/messages/users");
       set({ users: res.data });
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to load users");
     } finally {
       set({ isUsersLoading: false });
+    }
+  },
+
+  searchUser: async (query) => {
+    try {
+      const res = await apiClient.get(`/messages/search/${query}`);
+      return res.data;
+    } catch (error) {
+      toast.error(error.response?.data?.error || "User not found");
+      return null;
+    }
+  },
+
+  addFriend: async (friendId) => {
+    try {
+      const res = await apiClient.post("/messages/add-friend", { friendId });
+      toast.success(res.data.message);
+      set({ users: [res.data.friend, ...get().users] });
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to add friend");
     }
   },
 

@@ -53,7 +53,7 @@ export const getRegistrationOptions = async (req, res) => {
 			rpID: getRpID(req),
 			userID: Buffer.from(user._id.toString(), "utf-8"),
 			userName: user.username || user.email, // Fallback to email if username is missing
-			userDisplayName: user.fullName,
+			userDisplayName: user.username,
 			// Don't show authenticators that are already registered
 			excludeCredentials: (user.authenticators || []).map((auth) => ({
 				id: auth.credentialID,
@@ -176,8 +176,8 @@ export const verifyLogin = async (req, res) => {
 
 			res.status(200).json({
 				_id: user._id,
-				fullName: user.fullName,
 				username: user.username,
+				tag: user.tag,
 				email: user.email,
 				profilePic: user.profilePic,
 			});

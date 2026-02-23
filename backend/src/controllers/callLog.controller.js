@@ -8,8 +8,8 @@ export const getAllCallLogs = async (req, res) => {
     const logs = await CallLog.find({
       $or: [{ caller: userId }, { callee: userId }],
     })
-      .populate("caller", "fullName profilePic _id")
-      .populate("callee", "fullName profilePic _id")
+      .populate("caller", "username tag profilePic _id")
+      .populate("callee", "username tag profilePic _id")
       .sort({ createdAt: -1 }) // Show most recent calls first
       .lean(); // Use .lean() for better performance as we only need plain JS objects
 

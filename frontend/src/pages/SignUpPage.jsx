@@ -9,7 +9,6 @@ import toast from "react-hot-toast";
 const SignUpPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: "",
     username: "",
     email: "",
     password: "",
@@ -19,7 +18,6 @@ const SignUpPage = () => {
   const { signup, isSigningUp } = useAuthStore();
 
   const handleValidation = () => {
-    if (!formData.fullName.trim()) return "Full Name is required";
     if (!formData.username.trim()) return "Username is required";
     if (!formData.email.trim()) return "Email is required";
     if (!/\S+@\S+\.\S+/.test(formData.email)) return "Invalid email format";
@@ -61,24 +59,6 @@ const SignUpPage = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="form-control">
               <label className="label">
-                <span className="label-text font-medium">Full Name</span>
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="size-5 text-base-content/40" />
-                </div>
-                <input
-                  type="text"
-                  className={`input input-bordered w-full pl-10`}
-                  placeholder="John Doe"
-                  value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="form-control">
-              <label className="label">
                 <span className="label-text font-medium">Username</span>
               </label>
               <div className="relative">
@@ -88,7 +68,7 @@ const SignUpPage = () => {
                 <input
                   type="text"
                   className={`input input-bordered w-full pl-10`}
-                  placeholder="johndoe"
+                  placeholder="johndoe (tag will be added automatically)"
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 />

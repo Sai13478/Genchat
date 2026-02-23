@@ -87,7 +87,7 @@ const CallLogsPage = () => {
 
                             const otherUser = log.receiverId || (authUser?._id === log.caller._id ? log.callee : log.caller);
                             const isOutgoing = authUser?._id === log.caller._id;
-                            
+
                             // *** FIX: Use log.status to determine if a call was missed or declined ***
                             const wasMissedOrDeclined = log.status === "missed" || log.status === "declined";
                             const callDuration = formatDuration(log.duration);
@@ -99,14 +99,17 @@ const CallLogsPage = () => {
                                             <Phone size={20} />
                                         </div>
                                         <div>
-                                            <p className='font-semibold text-gray-800 dark:text-gray-200'>{otherUser?.fullName || "Unknown User"}</p>
+                                            <p className='font-semibold text-gray-800 dark:text-gray-200'>
+                                                {otherUser?.username || "Unknown User"}
+                                                {otherUser?.tag && <span className="text-xs opacity-50 ml-1">#{otherUser.tag}</span>}
+                                            </p>
                                             <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
-                                                {isOutgoing ? <ArrowUpRight size={16} className="mr-1"/> : <ArrowDownLeft size={16} className="mr-1"/>}
+                                                {isOutgoing ? <ArrowUpRight size={16} className="mr-1" /> : <ArrowDownLeft size={16} className="mr-1" />}
                                                 <span>{new Date(log.createdAt).toLocaleString()}</span>
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     {/* *** FIX: Display the correct status or duration *** */}
                                     <div className={`text-sm capitalize font-medium ${wasMissedOrDeclined ? "text-red-500" : "text-gray-500 dark:text-gray-400"}`}>
                                         {log.status === 'answered' ? callDuration : log.status}

@@ -7,36 +7,94 @@ export const getUsersForSidebar = async (req, res) => {
 	try {
 		const loggedInUserId = req.user._id;
 
-		// 1. Get all conversations for the logged-in user, sorted by most recent first
+		// 1. Get the logged-in user with their friends populated
+		const user = await User.findById(loggedInUserId).populate({
+			path: "friends",
+			select: "-password",
+		});
+
+		if (!user) {
+			return res.status(404).json({ error: "User not found" });
+		}
+
+		// 2. Get all conversations for the logged-in user to sort friends by recency
 		const conversations = await Conversation.find({
 			participants: loggedInUserId,
 		}).sort({ updatedAt: -1 });
 
-		// 2. Extract the other participant IDs from these conversations (in order)
+		// 3. Extract the other participant IDs from these conversations
 		const interactedUserIds = conversations.map(conv =>
 			conv.participants.find(p => p.toString() !== loggedInUserId.toString())
 		).filter(Boolean);
 
-		// 3. Get all users except the logged-in one
-		const allUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
-
-		// 4. Sort the users: those in interactedUserIds first (maintaining order), then the rest
-		const sortedUsers = [...allUsers].sort((a, b) => {
+		// 4. Sort the friends: those in interactedUserIds first (maintaining order), then the rest
+		const sortedFriends = [...user.friends].sort((a, b) => {
 			const indexA = interactedUserIds.indexOf(a._id.toString());
 			const indexB = interactedUserIds.indexOf(b._id.toString());
 
-			// If both have interactions, sort by their position in interactedUserIds (recency)
 			if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-			// If only one has interaction, put it first
 			if (indexA !== -1) return -1;
 			if (indexB !== -1) return 1;
-			// If neither has interactions, maintain alphabetical or original order
-			return a.fullName.localeCompare(b.fullName);
+			return a.username.localeCompare(b.username);
 		});
 
-		res.status(200).json(sortedUsers);
+		res.status(200).json(sortedFriends);
 	} catch (error) {
 		console.error("Error in getUsersForSidebar: ", error);
+		res.status(500).json({ error: "Internal server error" });
+	}
+};
+
+export const searchUser = async (req, res) => {
+	try {
+		const { query } = req.params; // Expecting "username#tag"
+		const [username, tag] = query.split("#");
+
+		if (!username || !tag) {
+			return res.status(400).json({ error: "Invalid search query. Use 'username#tag'." });
+		}
+
+		const user = await User.findOne({ username, tag }).select("-password");
+
+		if (!user) {
+			return res.status(404).json({ error: "User not found" });
+		}
+
+		res.status(200).json(user);
+	} catch (error) {
+		console.error("Error in searchUser: ", error);
+		res.status(500).json({ error: "Internal server error" });
+	}
+};
+
+export const addFriend = async (req, res) => {
+	try {
+		const { friendId } = req.body;
+		const loggedInUserId = req.user._id;
+
+		if (friendId === loggedInUserId.toString()) {
+			return res.status(400).json({ error: "You cannot add yourself as a friend" });
+		}
+
+		const user = await User.findById(loggedInUserId);
+		const friend = await User.findById(friendId);
+
+		if (!friend) {
+			return res.status(404).json({ error: "Friend user not found" });
+		}
+
+		if (user.friends.includes(friendId)) {
+			return res.status(400).json({ error: "User is already your friend" });
+		}
+
+		user.friends.push(friendId);
+		friend.friends.push(loggedInUserId);
+
+		await Promise.all([user.save(), friend.save()]);
+
+		res.status(200).json({ message: "Friend added successfully", friend: { _id: friend._id, username: friend.username, tag: friend.tag, profilePic: friend.profilePic } });
+	} catch (error) {
+		console.error("Error in addFriend: ", error);
 		res.status(500).json({ error: "Internal server error" });
 	}
 };

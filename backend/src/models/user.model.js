@@ -17,9 +17,8 @@ const userSchema = new mongoose.Schema(
     username: {
       type: String,
       required: true,
-      unique: true,
     },
-    fullName: {
+    tag: {
       type: String,
       required: true,
     },
@@ -32,12 +31,20 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    friends: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     // For WebAuthn
     authenticators: [authenticatorSchema],
     currentChallenge: { type: String },
   },
   { timestamps: true }
 );
+
+userSchema.index({ username: 1, tag: 1 }, { unique: true });
 
 const User = mongoose.model("User", userSchema);
 

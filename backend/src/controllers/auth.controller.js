@@ -5,11 +5,10 @@ import cloudinary from "../lib/cloudinary.js"; // Assuming cloudinary config is 
 
 export const signup = async (req, res) => {
 	try {
-		const { fullName, username, email, password, confirmPassword } = req.body;
+		const { username, email, password, confirmPassword } = req.body;
 
-		if (!fullName || !username || !email || !password || !confirmPassword) {
-			const missing = ["fullName", "username", "email", "password", "confirmPassword"].filter(f => !req.body[f]);
-			// Return a 400 Bad Request with a clear error message
+		if (!username || !email || !password || !confirmPassword) {
+			const missing = ["username", "email", "password", "confirmPassword"].filter(f => !req.body[f]);
 			return res.status(400).json({ error: `Please provide all required fields. Missing: ${missing.join(", ")}` });
 		}
 
@@ -17,11 +16,27 @@ export const signup = async (req, res) => {
 			return res.status(400).json({ error: "Passwords don't match" });
 		}
 
-		// Check if user already exists to provide a better error message upfront
-		const user = await User.findOne({ $or: [{ username }, { email }] });
-		if (user) {
-			// Use 409 Conflict for existing resources
-			return res.status(409).json({ error: "Username or email already exists" });
+		// Check if email already exists
+		const existingEmail = await User.findOne({ email });
+		if (existingEmail) {
+			return res.status(409).json({ error: "Email already exists" });
+		}
+
+		// Generate unique tag for the username
+		let tag;
+		let isUnique = false;
+		let attempts = 0;
+		while (!isUnique && attempts < 10) {
+			tag = Math.floor(1000 + Math.random() * 9000).toString();
+			const existingUser = await User.findOne({ username, tag });
+			if (!existingUser) {
+				isUnique = true;
+			}
+			attempts++;
+		}
+
+		if (!isUnique) {
+			return res.status(500).json({ error: "Could not generate a unique tag for this username. Please try another username." });
 		}
 
 		// HASH PASSWORD
@@ -29,8 +44,8 @@ export const signup = async (req, res) => {
 		const hashedPassword = await bcrypt.hash(password, salt);
 
 		const newUser = new User({
-			fullName,
 			username,
+			tag,
 			email,
 			password: hashedPassword,
 		});
@@ -43,8 +58,8 @@ export const signup = async (req, res) => {
 		// Return user data without the password
 		res.status(201).json({
 			_id: newUser._id,
-			fullName: newUser.fullName,
 			username: newUser.username,
+			tag: newUser.tag,
 			email: newUser.email,
 			profilePic: newUser.profilePic,
 		});
@@ -81,8 +96,8 @@ export const login = async (req, res) => {
 
 		res.status(200).json({
 			_id: user._id,
-			fullName: user.fullName,
 			username: user.username,
+			tag: user.tag,
 			email: user.email,
 			profilePic: user.profilePic,
 		});
@@ -145,7 +160,7 @@ export const updateProfile = async (req, res) => {
 		await user.save();
 
 		// Return a consistent user object
-		const userResponse = { _id: user._id, fullName: user.fullName, username: user.username, email: user.email, profilePic: user.profilePic };
+		const userResponse = { _id: user._id, username: user.username, tag: user.tag, email: user.email, profilePic: user.profilePic };
 		res.status(200).json({ message: "Profile updated successfully", user: userResponse });
 	} catch (error) {
 		console.error("Error in updateProfile controller:", error);
