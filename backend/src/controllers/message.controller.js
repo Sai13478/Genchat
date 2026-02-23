@@ -98,7 +98,7 @@ export const addFriend = async (req, res) => {
 			return res.status(404).json({ error: "Friend user not found" });
 		}
 
-		if (user.friends.includes(friendId)) {
+		if (user.friends.some(id => id.toString() === friendId)) {
 			return res.status(400).json({ error: "User is already your friend" });
 		}
 
