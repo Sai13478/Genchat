@@ -64,6 +64,12 @@ export const searchUser = async (req, res) => {
 	try {
 		const { q: query } = req.query; // Expecting "username#tag" via ?q=...
 
+		if (!query || !query.includes("#")) {
+			return res.status(400).json({ error: "Invalid search query. Use 'username#tag'." });
+		}
+
+		const [username, tag] = query.split("#");
+
 		if (!username || !tag) {
 			return res.status(400).json({ error: "Invalid search query. Use 'username#tag'." });
 		}
