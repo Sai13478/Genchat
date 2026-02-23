@@ -96,8 +96,8 @@ export const login = async (req, res) => {
 
 		res.status(200).json({
 			_id: user._id,
-			username: user.username,
-			tag: user.tag,
+			username: user.username || user.email?.split("@")[0] || "User",
+			tag: user.tag || "0000",
 			email: user.email,
 			profilePic: user.profilePic,
 		});
@@ -120,10 +120,15 @@ export const logout = (req, res) => {
 export const checkAuth = async (req, res) => {
 	try {
 		// req.user is attached by the protectRoute middleware
-		const user = await User.findById(req.user._id).select("-password");
+		const user = await User.findById(req.user._id).select("-password").lean();
 		if (!user) {
 			return res.status(404).json({ error: "User not found" });
 		}
+
+		// Fallback for older users missing username or tag
+		user.username = user.username || user.email?.split("@")[0] || "User";
+		user.tag = user.tag || "0000";
+
 		res.status(200).json(user);
 	} catch (error) {
 		console.error("Error in checkAuth controller:", error);

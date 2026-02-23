@@ -28,17 +28,32 @@ export const getUsersForSidebar = async (req, res) => {
 		).filter(Boolean);
 
 		// 4. Sort the friends: those in interactedUserIds first (maintaining order), then the rest
-		const sortedFriends = [...user.friends].sort((a, b) => {
-			const indexA = interactedUserIds.indexOf(a._id.toString());
-			const indexB = interactedUserIds.indexOf(b._id.toString());
+		const friends = user.friends || [];
+		const sortedFriends = [...friends].sort((a, b) => {
+			const idA = a._id?.toString();
+			const idB = b._id?.toString();
+
+			const indexA = iteratedUserIds.indexOf(idA);
+			const indexB = iteratedUserIds.indexOf(idB);
 
 			if (indexA !== -1 && indexB !== -1) return indexA - indexB;
 			if (indexA !== -1) return -1;
 			if (indexB !== -1) return 1;
-			return a.username.localeCompare(b.username);
+
+			// Fallback to email or "User" if username is missing (for older users)
+			const nameA = a.username || a.email || "User";
+			const nameB = b.username || b.email || "User";
+			return nameA.localeCompare(nameB);
 		});
 
-		res.status(200).json(sortedFriends);
+		// Ensure every friend has a tag and username fallback for the frontend
+		const finalFriends = sortedFriends.map(f => ({
+			...f.toObject ? f.toObject() : f,
+			username: f.username || f.email?.split("@")[0] || "User",
+			tag: f.tag || "0000"
+		}));
+
+		res.status(200).json(finalFriends);
 	} catch (error) {
 		console.error("Error in getUsersForSidebar: ", error);
 		res.status(500).json({ error: "Internal server error" });
