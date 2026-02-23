@@ -3,10 +3,11 @@ services:
     name: Genchat
     env: node
     buildCommand: |
+      # Build frontend
       cd frontend && npm install && npm run build
+      # Install backend dependencies
       cd ../backend && npm install
-    startCommand: node src/index.js
-    rootDir: backend
+    startCommand: cd backend && node src/index.js
     envVars:
       - key: NODE_ENV
         value: production
