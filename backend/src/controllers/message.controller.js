@@ -1,7 +1,7 @@
 import User from "../models/user.model.js";
 import Conversation from "../models/conversation.model.js";
 import Message from "../models/message.model.js";
-import { getIO, getReceiverSocketIds } from "../lib/socket.js";
+// Socket imports will be handled dynamically inside functions to avoid circular dependencies
 
 export const getUsersForSidebar = async (req, res) => {
 	try {
@@ -109,7 +109,7 @@ export const sendFriendRequest = async (req, res) => {
 		}
 
 		// Check if request already sent
-		const alreadyRequested = targetUser.friendRequests.some(req => req.from.toString() === senderId.toString());
+		const alreadyRequested = targetUser.friendRequests.some(fr => fr.from.toString() === senderId.toString());
 		if (alreadyRequested) {
 			return res.status(400).json({ error: "Friend request already sent." });
 		}
@@ -124,6 +124,7 @@ export const sendFriendRequest = async (req, res) => {
 		await targetUser.save();
 
 		// Real-time notification
+		const { getIO, getReceiverSocketIds } = await import("../lib/socket.js");
 		const io = getIO();
 		const receiverSocketIds = getReceiverSocketIds(targetId);
 		receiverSocketIds.forEach(socketId => {
@@ -162,22 +163,35 @@ export const acceptFriendRequest = async (req, res) => {
 		const userId = req.user._id;
 
 		const user = await User.findById(userId);
-		const request = user.friendRequests.find(req => req.from.toString() === requestId);
+		if (!user) return res.status(404).json({ error: "User not found." });
 
-		if (!request) {
+		const requestIndex = user.friendRequests.findIndex(fr => fr.from && fr.from.toString() === requestId);
+
+		if (requestIndex === -1) {
 			return res.status(404).json({ error: "Friend request not found." });
 		}
 
-		// Add each other as friends
-		user.friends.push(requestId);
-		user.friendRequests = user.friendRequests.filter(req => req.from.toString() !== requestId);
+		// Add each other as friends if not already friends
+		if (!user.friends.includes(requestId)) {
+			user.friends.push(requestId);
+		}
+
+		// Remove the request
+		user.friendRequests.splice(requestIndex, 1);
 		await user.save();
 
 		const friendUser = await User.findById(requestId);
-		friendUser.friends.push(userId);
-		await friendUser.save();
+		if (!friendUser) {
+			return res.status(404).json({ error: "Sender user no longer exists." });
+		}
+
+		if (!friendUser.friends.includes(userId)) {
+			friendUser.friends.push(userId);
+			await friendUser.save();
+		}
 
 		// Socket notification for the other person
+		const { getIO, getReceiverSocketIds } = await import("../lib/socket.js");
 		const io = getIO();
 		const friendSocketIds = getReceiverSocketIds(requestId);
 		friendSocketIds.forEach(socketId => {
@@ -202,7 +216,9 @@ export const rejectFriendRequest = async (req, res) => {
 		const userId = req.user._id;
 
 		const user = await User.findById(userId);
-		user.friendRequests = user.friendRequests.filter(req => req.from.toString() !== requestId);
+		if (!user) return res.status(404).json({ error: "User not found." });
+
+		user.friendRequests = user.friendRequests.filter(fr => fr.from && fr.from.toString() !== requestId);
 		await user.save();
 
 		res.status(200).json({ message: "Friend request rejected." });
@@ -251,6 +267,7 @@ export const sendMessage = async (req, res) => {
 		await Promise.all([conversation.save(), newMessage.save()]);
 
 		// SOCKET.IO - Emit the event to the receiver's room
+		const { getIO } = await import("../lib/socket.js");
 		const io = getIO();
 		io.to(receiverId).emit("newMessage", newMessage);
 
