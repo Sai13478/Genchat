@@ -1,7 +1,18 @@
-import User from "../models/user.model.js";
-import bcrypt from "bcryptjs";
-import { generateToken } from "../lib/utils.js";
-import cloudinary from "../lib/cloudinary.js"; // Assuming cloudinary config is in lib/cloudinary.js
+// Helper function to generate a unique tag for a username
+const generateUniqueTag = async (username) => {
+	let tag;
+	let isUnique = false;
+	let attempts = 0;
+	while (!isUnique && attempts < 10) {
+		tag = Math.floor(1000 + Math.random() * 9000).toString();
+		const existingUser = await User.findOne({ username, tag });
+		if (!existingUser) {
+			isUnique = true;
+		}
+		attempts++;
+	}
+	return isUnique ? tag : null;
+};
 
 export const signup = async (req, res) => {
 	try {
@@ -23,19 +34,9 @@ export const signup = async (req, res) => {
 		}
 
 		// Generate unique tag for the username
-		let tag;
-		let isUnique = false;
-		let attempts = 0;
-		while (!isUnique && attempts < 10) {
-			tag = Math.floor(1000 + Math.random() * 9000).toString();
-			const existingUser = await User.findOne({ username, tag });
-			if (!existingUser) {
-				isUnique = true;
-			}
-			attempts++;
-		}
+		const tag = await generateUniqueTag(username);
 
-		if (!isUnique) {
+		if (!tag) {
 			return res.status(500).json({ error: "Could not generate a unique tag for this username. Please try another username." });
 		}
 
@@ -92,12 +93,28 @@ export const login = async (req, res) => {
 			return res.status(400).json({ error: "Invalid credentials" });
 		}
 
+		// Legacy Migration: Generate username/tag if missing
+		let modified = false;
+		if (!user.username) {
+			user.username = user.email.split("@")[0] || "User";
+			modified = true;
+		}
+		if (!user.tag) {
+			const tag = await generateUniqueTag(user.username);
+			user.tag = tag || "0000";
+			modified = true;
+		}
+
+		if (modified) {
+			await user.save();
+		}
+
 		generateToken(user._id, res);
 
 		res.status(200).json({
 			_id: user._id,
-			username: user.username || user.email?.split("@")[0] || "User",
-			tag: user.tag || "0000",
+			username: user.username,
+			tag: user.tag,
 			email: user.email,
 			profilePic: user.profilePic,
 		});
@@ -120,14 +137,26 @@ export const logout = (req, res) => {
 export const checkAuth = async (req, res) => {
 	try {
 		// req.user is attached by the protectRoute middleware
-		const user = await User.findById(req.user._id).select("-password").lean();
+		const user = await User.findById(req.user._id).select("-password");
 		if (!user) {
 			return res.status(404).json({ error: "User not found" });
 		}
 
-		// Fallback for older users missing username or tag
-		user.username = user.username || user.email?.split("@")[0] || "User";
-		user.tag = user.tag || "0000";
+		// Legacy Migration: Generate username/tag if missing
+		let modified = false;
+		if (!user.username) {
+			user.username = user.email.split("@")[0] || "User";
+			modified = true;
+		}
+		if (!user.tag) {
+			const tag = await generateUniqueTag(user.username);
+			user.tag = tag || "0000";
+			modified = true;
+		}
+
+		if (modified) {
+			await user.save();
+		}
 
 		res.status(200).json(user);
 	} catch (error) {
