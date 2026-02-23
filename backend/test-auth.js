@@ -49,12 +49,12 @@ async function testSignup() {
       password: TEST_PASSWORD,
       confirmPassword: TEST_PASSWORD,
     });
-    
+
     console.log('✅ Signup successful:', {
       userId: response.data.user._id,
       email: response.data.user.email,
     });
-    
+
     return response.data.user;
   } catch (error) {
     handleApiError(error, 'during signup');
@@ -113,7 +113,7 @@ async function testAuthCheck() {
         throw error;
       }
     }
-    
+
     // Now try with an authenticated request by manually adding the cookie
     const response = await api.get('/auth/check', {
       headers: { Cookie: authTokenCookie },
@@ -123,7 +123,7 @@ async function testAuthCheck() {
       userId: response.data._id,
       email: response.data.email,
     });
-    
+
     return response.data;
   } catch (error) {
     handleApiError(error, 'during auth check');
@@ -137,7 +137,7 @@ async function testProfileUpdate() {
 
     // Create a simple base64 encoded image for testing
     const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
-    
+
     // Send the request with the auth cookie
     const response = await api.put('/auth/update-profile', { profilePic: testImage }, {
       headers: { Cookie: authTokenCookie },
@@ -146,7 +146,7 @@ async function testProfileUpdate() {
     console.log('✅ Profile update successful:', {
       profilePic: response.data.user.profilePic,
     });
-    
+
     return response.data.user;
   } catch (error) {
     handleApiError(error, 'during profile update');
@@ -169,7 +169,7 @@ async function runTests() {
 
     // Test profile update
     await testProfileUpdate();
-    
+
     console.log('\n🎉 All tests completed successfully!');
   } catch (error) {
     console.error('❌ Test failed:', error);

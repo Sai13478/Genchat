@@ -45,12 +45,48 @@ const useListenMessages = () => {
 				if (document.hidden || selectedUser?._id !== newMessage.senderId) {
 					showNotification(newMessage);
 				}
+
+				// If receiver is in the chat, mark as seen
+				if (!document.hidden && selectedUser?._id === newMessage.senderId) {
+					socket.emit("markMessagesAsSeen", {
+						conversationId: selectedUser.conversationId,
+						userIdOfSender: selectedUser._id
+					});
+				}
 			}
 		};
 
-		socket.on("newMessage", handleNewMessage);
+		const handleMessagesDelivered = ({ conversationId, receiverId }) => {
+			const { messages, setMessages } = useChatStore.getState();
+			const updatedMessages = messages.map((m) => {
+				if (m.receiverId === receiverId || m.conversationId === conversationId) {
+					return { ...m, delivered: true };
+				}
+				return m;
+			});
+			setMessages(updatedMessages);
+		};
 
-		return () => socket.off("newMessage", handleNewMessage);
+		const handleMessagesSeen = ({ conversationId }) => {
+			const { messages, setMessages } = useChatStore.getState();
+			const updatedMessages = messages.map((m) => {
+				if (m.conversationId === conversationId) {
+					return { ...m, seen: true, delivered: true };
+				}
+				return m;
+			});
+			setMessages(updatedMessages);
+		};
+
+		socket.on("newMessage", handleNewMessage);
+		socket.on("messagesDelivered", handleMessagesDelivered);
+		socket.on("messagesSeen", handleMessagesSeen);
+
+		return () => {
+			socket.off("newMessage", handleNewMessage);
+			socket.off("messagesDelivered", handleMessagesDelivered);
+			socket.off("messagesSeen", handleMessagesSeen);
+		};
 	}, [socket, selectedUser, authUser]);
 };
 

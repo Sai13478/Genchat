@@ -176,6 +176,36 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("markMessagesAsDelivered", async ({ conversationId, userIdOfSender }) => {
+    try {
+      await Message.updateMany(
+        { conversationId: conversationId, delivered: false, senderId: userIdOfSender },
+        { $set: { delivered: true } }
+      );
+      io.to(userIdOfSender).emit("messagesDelivered", { conversationId });
+    } catch (error) {
+      console.error("Error marking messages as delivered:", error);
+    }
+  });
+
+  // Check for undelivered messages and notify senders
+  (async () => {
+    try {
+      const undeliveredMessages = await Message.find({ receiverId: userId, delivered: false });
+      if (undeliveredMessages.length > 0) {
+        // Group by sender to emit efficiently
+        const senderIds = [...new Set(undeliveredMessages.map(m => m.senderId.toString()))];
+        await Message.updateMany({ receiverId: userId, delivered: false }, { $set: { delivered: true } });
+
+        senderIds.forEach(senderId => {
+          io.to(senderId).emit("messagesDelivered", { receiverId: userId });
+        });
+      }
+    } catch (error) {
+      console.error("Error checking undelivered messages on connection:", error);
+    }
+  })();
+
 });
 
 export { server, io, getReceiverSocketIds };

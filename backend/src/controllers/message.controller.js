@@ -69,6 +69,13 @@ export const sendMessage = async (req, res) => {
 			conversation.messages.push(newMessage._id);
 		}
 
+		// Check if receiver is online
+		const { getReceiverSocketIds } = await import("../lib/socket.js");
+		const receiverSocketIds = getReceiverSocketIds(receiverId);
+		if (receiverSocketIds.size > 0) {
+			newMessage.delivered = true;
+		}
+
 		// this will run in parallel
 		await Promise.all([conversation.save(), newMessage.save()]);
 

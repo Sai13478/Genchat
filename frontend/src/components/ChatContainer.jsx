@@ -8,7 +8,7 @@ import { formatMessageTime } from "../lib/utils";
 import useListenMessages from "../hooks/useListenMessages";
 import useListenTyping from "../hooks/useListenTyping";
 import { useSocket } from "../context/SocketContext";
-import { CheckCheck } from "lucide-react";
+import { Check, CheckCheck } from "lucide-react";
 
 const ChatContainer = () => {
   const { messages, getMessages, isMessagesLoading, selectedUser } = useChatStore();
@@ -82,7 +82,13 @@ const ChatContainer = () => {
               </div>
               {message.senderId === authUser._id && (
                 <div className='chat-footer opacity-50 flex gap-1 items-center'>
-                  <CheckCheck className={`size-4 ${message.seen ? "text-blue-500" : ""}`} />
+                  {message.seen ? (
+                    <CheckCheck className='size-4 text-blue-500' />
+                  ) : message.delivered ? (
+                    <CheckCheck className='size-4 text-zinc-400' />
+                  ) : (
+                    <Check className='size-4 text-zinc-400' />
+                  )}
                 </div>
               )}
             </div>
