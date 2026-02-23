@@ -144,7 +144,9 @@ export const checkAuth = async (req, res) => {
 		// req.user is attached by the protectRoute middleware
 		const user = await User.findById(req.user._id).select("-password");
 		if (!user) {
-			return res.status(404).json({ error: "User not found" });
+			// Clear the stale cookie so the browser stops retrying
+			res.cookie("jwt", "", { maxAge: 0 });
+			return res.status(401).json({ error: "Session expired. Please log in again." });
 		}
 
 		// Legacy Migration: Generate username/tag if missing

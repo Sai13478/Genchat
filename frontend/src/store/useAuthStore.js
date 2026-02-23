@@ -12,17 +12,11 @@ export const useAuthStore = create((set, get) => ({
   checkAuth: async () => {
     set({ isCheckingAuth: true });
     try {
-      // Use the new apiClient which has the correct base URL ("/api")
       const res = await apiClient.get("/auth/check");
       set({ authUser: res.data });
     } catch (error) {
-      if (error.response?.status === 401) {
-        // This is the expected flow for an unauthenticated user.
-        console.info("Auth check failed (401): User is not logged in. This is expected.");
-      } else {
-        // Log other errors more verbosely.
-        console.error("Error in checkAuth:", error.response?.data?.error || error.message);
-      }
+      // 401 and 404 are expected when the user is not logged in or session expired.
+      // Silently set authUser to null — the app will redirect to login.
       set({ authUser: null });
     } finally {
       set({ isCheckingAuth: false });
