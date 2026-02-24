@@ -158,11 +158,8 @@ export const useCallStore = create((set, get) => ({
         const { callType } = incomingCallData;
 
         try {
-            // Relaxed constraints for better compatibility on all devices
-            const videoConstraints = callType === "video" ? {
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            } : false;
+            // Maximum compatibility for integrated laptop cameras: just use "true"
+            const videoConstraints = callType === "video" ? true : false;
 
             console.log("Requesting getUserMedia with constraints:", { video: videoConstraints, audio: true });
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -338,11 +335,10 @@ export const useCallStore = create((set, get) => ({
         if (isScreenSharing) {
             // --- STOP SCREEN SHARING & REVERT TO CAMERA ---
             try {
-                // Request HD quality when switching back to the camera
+                // Request basic quality when switching back to the camera for compatibility
                 const videoConstraints = {
                     width: { ideal: 1280 },
                     height: { ideal: 720 },
-                    frameRate: { ideal: 30 },
                 };
 
                 const cameraStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
@@ -359,6 +355,11 @@ export const useCallStore = create((set, get) => ({
                 // Update local stream with camera video and existing audio
                 const newStream = new MediaStream([cameraTrack, ...localStream.getAudioTracks()]);
                 set({ localStream: newStream, isScreenSharing: false });
+
+                // Manually trigger a formal renegotiation to ensure remote peer's decoder updates
+                if (peerConnection.onnegotiationneeded) {
+                    await peerConnection.onnegotiationneeded();
+                }
             } catch (error) {
                 console.error("Error switching back to camera:", error);
                 toast.error("Could not switch back to camera. Please check permissions.");
@@ -382,6 +383,11 @@ export const useCallStore = create((set, get) => ({
 
                 const newStream = new MediaStream([screenTrack, ...localStream.getAudioTracks()]);
                 set({ localStream: newStream, isScreenSharing: true });
+
+                // Manually trigger a formal renegotiation to ensure remote peer's decoder updates
+                if (peerConnection.onnegotiationneeded) {
+                    await peerConnection.onnegotiationneeded();
+                }
             } catch (error) {
                 console.error("Error starting screen share:", error);
                 if (error.name !== "NotAllowedError" && error.name !== "NotFoundError") {

@@ -40,7 +40,8 @@ function App() {
         hangup,
         handleRenegotiation,
         handleCallAnsweredElsewhere,
-        handleCallDeclinedElsewhere
+        handleCallDeclinedElsewhere,
+        setCallId
     } = useCallStore();
 
     // Effect for checking authentication status on initial load
@@ -74,6 +75,7 @@ function App() {
         };
 
         socket.on("incoming-call", handleIncomingCall);
+        socket.on("call-initiated", ({ callId }) => setCallId(callId));
         socket.on("user-offline", handleUserOffline);
         socket.on("call-declined", handleCallDeclined);
         socket.on("call-answered-elsewhere", handleCallAnsweredElsewhere);
@@ -81,6 +83,7 @@ function App() {
 
         return () => {
             socket.off("incoming-call", handleIncomingCall);
+            socket.off("call-initiated");
             socket.off("user-offline", handleUserOffline);
             socket.off("call-declined", handleCallDeclined);
             socket.off("call-answered-elsewhere", handleCallAnsweredElsewhere);

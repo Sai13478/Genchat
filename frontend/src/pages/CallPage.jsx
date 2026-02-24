@@ -132,7 +132,7 @@ const CallPage = () => {
             <audio ref={remoteAudioRef} autoPlay playsInline />
 
             {/* Header / Info */}
-            <div className="absolute top-12 left-0 right-0 z-10 flex flex-col items-center gap-2 animate-in fade-in slide-in-from-top duration-700">
+            <div className="absolute top-20 left-0 right-0 z-10 flex flex-col items-center gap-2 animate-in fade-in slide-in-from-top duration-700">
                 <div className="flex items-center gap-2 text-zinc-400">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="text-sm font-medium uppercase tracking-[0.2em]">End-to-end encrypted</span>
@@ -178,7 +178,7 @@ const CallPage = () => {
                 {/* Local Video Preview (Picture in Picture) */}
                 {callType === "video" && localStream && (
                     <div className="absolute bottom-32 right-6 sm:right-10 w-32 h-44 sm:w-48 sm:h-64 overflow-hidden rounded-2xl border-2 border-white/30 shadow-2xl z-20 animate-in zoom-in slide-in-from-right duration-700 bg-black">
-                        <video ref={localVideoRef} autoPlay playsInline muted className='w-full h-full object-contain video-mirror' />
+                        <video ref={localVideoRef} autoPlay playsInline muted className='w-full h-full object-contain -scale-x-100' />
                     </div>
                 )}
             </div>
@@ -238,9 +238,6 @@ const CallPage = () => {
                 </div>
             </div>
 
-            <style jsx>{`
-                .video-mirror { transform: scaleX(-1); }
-            `}</style>
         </div>
     );
 };

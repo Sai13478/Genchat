@@ -94,6 +94,7 @@ io.on("connection", (socket) => {
         await newLog.save();
 
         const callId = newLog._id.toString();
+        socket.emit("call-initiated", { callId });
 
         io.to(to).emit("incoming-call", { from: callerUser, offer, callId, callType });
 
