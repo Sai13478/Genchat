@@ -80,9 +80,9 @@ const MessageInput = () => {
 				</div>
 			)}
 
-			<form onSubmit={handleSendMessage} className='flex items-center gap-2'>
+			<form onSubmit={handleSendMessage} className='flex items-center gap-3 bg-white/20 backdrop-blur-lg p-2 rounded-2xl border border-white/20'>
 				<div className='flex-1 flex gap-2'>
-					<input type='text' className='w-full input input-bordered rounded-lg input-sm sm:input-md' placeholder='Type a message...' value={text} onChange={handleTyping} />
+					<input type='text' className='w-full bg-white/40 border-none focus:ring-2 focus:ring-primary/30 rounded-xl px-4 py-2 text-sm outline-none transition-all placeholder:text-base-content/40' placeholder='Type a message...' value={text} onChange={handleTyping} />
 					<input type='file' accept='image/*' className='hidden' ref={fileInputRef} onChange={handleImageChange} />
 
 					<button type='button' className={`hidden sm:flex btn btn-circle ${imagePreview ? "text-emerald-500" : "text-zinc-400"}`} onClick={() => fileInputRef.current?.click()}>

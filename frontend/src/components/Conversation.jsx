@@ -7,8 +7,8 @@ const Conversation = ({ conversation, isOnline }) => {
 	return (
 		<>
 			<div
-				className={`flex gap-2 items-center hover:bg-sky-500 rounded p-2 py-1 cursor-pointer
-				${isSelected ? "bg-sky-500" : ""}
+				className={`flex gap-3 items-center hover:bg-primary/10 rounded-xl p-2 cursor-pointer transition-all duration-300
+				${isSelected ? "bg-primary/20 shadow-sm" : ""}
 			`}
 				onClick={() => setSelectedUser(conversation)}
 			>
@@ -18,14 +18,14 @@ const Conversation = ({ conversation, isOnline }) => {
 					</div>
 				</div>
 
-				<div className='flex flex-col flex-1'>
-					<p className='font-bold text-gray-200'>
+				<div className='flex flex-col flex-1 min-w-0'>
+					<p className={`font-bold transition-colors ${isSelected ? "text-primary" : "text-base-content"}`}>
 						{conversation.username}
-						<span className='text-xs opacity-50 ml-1'>#{conversation.tag}</span>
+						<span className='text-[10px] opacity-40 ml-1'>#{conversation.tag}</span>
 					</p>
 				</div>
 			</div>
-			<div className='divider my-0 py-0 h-1' />
+			<div className='border-b border-white/5 mx-4' />
 		</>
 	);
 };

@@ -4,10 +4,11 @@
 
 @layer utilities {
     .glassy {
-        @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-xl;
+        @apply bg-white/40 backdrop-blur-2xl border border-white/40 shadow-[0_8px_32px_0_rgba(31, 38, 135, 0.07)] ring-1 ring-white/20;
     }
+
     .glassy-dark {
-        @apply bg-slate-900/70 backdrop-blur-xl border border-white/10 shadow-xl;
+        @apply bg-slate-900/60 backdrop-blur-2xl border border-white/10 shadow-2xl;
     }
 }
 
@@ -18,18 +19,20 @@
 
 html,
 body {
-  height: 100%;
-  margin: 0;
-  @apply bg-base-200 text-base-content antialiased;
+    height: 100%;
+    margin: 0;
+    @apply bg-base-200 text-base-content antialiased;
 }
 
 /* Premium Scrollbar */
 ::-webkit-scrollbar {
     width: 6px;
 }
+
 ::-webkit-scrollbar-track {
     @apply bg-transparent;
 }
+
 ::-webkit-scrollbar-thumb {
     @apply bg-primary/20 rounded-full hover:bg-primary/40 transition-all;
 }

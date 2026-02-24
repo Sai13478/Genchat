@@ -40,7 +40,7 @@ const ChatHeader = () => {
     };
 
     return (
-        <div className='flex items-center justify-between p-4 border-b bg-base-200'>
+        <div className='flex items-center justify-between p-4 border-b border-white/20 bg-white/10 backdrop-blur-md'>
             <div className='flex items-center gap-3'>
                 {/* Back button - visible only on mobile */}
                 <button
@@ -55,11 +55,11 @@ const ChatHeader = () => {
                     </div>
                 </div>
                 <div className='flex flex-col'>
-                    <p className='font-bold text-gray-200'>
+                    <p className='font-bold text-base-content'>
                         {selectedUser.username}
-                        <span className="text-xs opacity-50 ml-1">#{selectedUser.tag}</span>
+                        <span className="text-[10px] opacity-40 ml-1">#{selectedUser.tag}</span>
                     </p>
-                    <span className='text-xs text-gray-400'>{isTyping ? "typing..." : isOnline ? "Online" : "Offline"}</span>
+                    <span className='text-[10px] text-base-content/50 font-medium tracking-wide uppercase'>{isTyping ? "typing..." : isOnline ? "Online" : "Offline"}</span>
                 </div>
             </div>
             <div className='flex gap-4'>

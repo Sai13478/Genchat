@@ -47,7 +47,7 @@ const Sidebar = () => {
     };
 
     return (
-        <div className='border-r border-base-300 p-4 flex flex-col w-full h-full'>
+        <div className='flex flex-col w-full h-full p-4 overflow-hidden'>
             <div className='flex items-center justify-between mb-4'>
                 <div className='flex items-center gap-2'>
                     <img src={authUser.profilePic || "/avatar.png"} alt='User avatar' className='size-8 rounded-full border' />
@@ -85,7 +85,7 @@ const Sidebar = () => {
 
             {/* Search Result */}
             {searchResult && (
-                <div className="bg-base-200 p-3 rounded-lg mb-4 animate-in fade-in slide-in-from-top-2 border border-primary/20">
+                <div className="bg-white/30 backdrop-blur-md p-3 rounded-2xl mb-4 animate-in fade-in slide-in-from-top-2 border border-white/40 shadow-sm">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <img src={searchResult.profilePic || "/avatar.png"} alt="avatar" className="size-8 rounded-full border" />
@@ -104,7 +104,7 @@ const Sidebar = () => {
                     <p className="text-xs font-semibold opacity-50 mb-2 px-1 uppercase tracking-wider">Friend Requests ({friendRequests.length})</p>
                     <div className="space-y-2 max-h-40 overflow-auto pr-1">
                         {friendRequests.map((req) => (
-                            <div key={req._id} className="bg-base-200 p-2 rounded-lg flex items-center justify-between border border-primary/10">
+                            <div key={req._id} className="bg-white/30 backdrop-blur-md p-2 rounded-xl flex items-center justify-between border border-white/40">
                                 <div className="flex items-center gap-2">
                                     <img src={req.from.profilePic || "/avatar.png"} alt="avatar" className="size-6 rounded-full border" />
                                     <p className="text-xs font-medium truncate max-w-[80px]">{req.from.username}</p>

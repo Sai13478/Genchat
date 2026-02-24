@@ -74,11 +74,11 @@ const ChatContainer = () => {
               <div className='chat-header mb-1'>
                 <time className='text-xs opacity-50 ml-1'>{formatMessageTime(message.createdAt)}</time>
               </div>
-              <div className='chat-bubble flex flex-col'>
+              <div className={`chat-bubble flex flex-col shadow-sm ${message.senderId === authUser._id ? "bg-primary text-primary-content" : "bg-white/50 backdrop-blur-md text-base-content border border-white/20"}`}>
                 {message.image && (
-                  <img src={message.image} alt='Attachment' className='sm:max-w-[200px] rounded-md mb-2' />
+                  <img src={message.image} alt='Attachment' className='sm:max-w-[200px] rounded-xl mb-2' />
                 )}
-                {message.text && <p>{message.text}</p>}
+                {message.text && <p className="leading-relaxed">{message.text}</p>}
               </div>
               {message.senderId === authUser._id && (
                 <div className='chat-footer opacity-50 flex gap-1 items-center'>
