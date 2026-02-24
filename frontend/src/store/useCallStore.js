@@ -5,12 +5,11 @@ let peerConnection;
 let makingOffer = false;
 
 const configuration = {
+    iceTransportPolicy: "relay", // Force TURN to bypass restrictive firewalls
+    bundlePolicy: "max-bundle",
+    rtcpMuxPolicy: "require",
+    iceCandidatePoolSize: 0, // Disable pooling for stability
     iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:stun3.l.google.com:19302" },
-        { urls: "stun:stun4.l.google.com:19302" },
         {
             urls: [
                 "turn:openrelay.metered.ca:80",
@@ -22,9 +21,6 @@ const configuration = {
             credential: "openrelayproject",
         },
     ],
-    iceCandidatePoolSize: 10,
-    bundlePolicy: "max-bundle",
-    rtcpMuxPolicy: "require",
 };
 
 export const useCallStore = create((set, get) => ({
@@ -73,9 +69,31 @@ export const useCallStore = create((set, get) => ({
             }
         };
 
-        peerConnection.oniceconnectionstatechange = () => {
+        peerConnection.oniceconnectionstatechange = async () => {
             if (peerConnection) {
-                console.log(`ICE Connection state: ${peerConnection.iceConnectionState}`);
+                const state = peerConnection.iceConnectionState;
+                console.log("ICE state:", state);
+
+                if (state === "failed") {
+                    console.log("Restarting ICE...");
+                    try {
+                        const offer = await peerConnection.createOffer({ iceRestart: true });
+                        await peerConnection.setLocalDescription(offer);
+
+                        const { callee, caller, callId } = get();
+                        const otherUser = callee || caller;
+
+                        if (otherUser) {
+                            socket.emit("renegotiate-call", {
+                                to: otherUser._id,
+                                offer,
+                                callId
+                            });
+                        }
+                    } catch (e) {
+                        console.error("ICE restart failed", e);
+                    }
+                }
             }
         };
 
@@ -131,6 +149,8 @@ export const useCallStore = create((set, get) => ({
 
         peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
+                console.log("ICE →", event.candidate.type, event.candidate.protocol);
+
                 const { callee, caller, callId } = get();
                 const otherUser = get().callState === "calling" ? callee : caller;
                 if (otherUser) {
