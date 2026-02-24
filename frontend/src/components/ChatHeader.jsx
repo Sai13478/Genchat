@@ -20,14 +20,15 @@ const ChatHeader = () => {
 
     const handleCall = async (callType) => {
         try {
-            const videoConstraints = {
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
+            const videoConstraints = callType === "video" ? {
+                width: { ideal: 1280, max: 1920 },
+                height: { ideal: 720, max: 1080 },
                 frameRate: { ideal: 30 },
-            };
+                facingMode: "user"
+            } : false;
 
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: callType === "video" ? videoConstraints : false,
+                video: videoConstraints,
                 audio: true,
             });
             setLocalStream(stream);

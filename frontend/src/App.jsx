@@ -33,7 +33,15 @@ function App() {
     useListenMessages();
 
     // Destructure all necessary methods from the call store
-    const { setIncomingCallData, handleCallAccepted, handleNewIceCandidate, hangup, handleRenegotiation } = useCallStore();
+    const {
+        setIncomingCallData,
+        handleCallAccepted,
+        handleNewIceCandidate,
+        hangup,
+        handleRenegotiation,
+        handleCallAnsweredElsewhere,
+        handleCallDeclinedElsewhere
+    } = useCallStore();
 
     // Effect for checking authentication status on initial load
     useEffect(() => {
@@ -68,13 +76,17 @@ function App() {
         socket.on("incoming-call", handleIncomingCall);
         socket.on("user-offline", handleUserOffline);
         socket.on("call-declined", handleCallDeclined);
+        socket.on("call-answered-elsewhere", handleCallAnsweredElsewhere);
+        socket.on("call-declined-elsewhere", handleCallDeclinedElsewhere);
 
         return () => {
             socket.off("incoming-call", handleIncomingCall);
             socket.off("user-offline", handleUserOffline);
             socket.off("call-declined", handleCallDeclined);
+            socket.off("call-answered-elsewhere", handleCallAnsweredElsewhere);
+            socket.off("call-declined-elsewhere", handleCallDeclinedElsewhere);
         };
-    }, [socket, navigate, setIncomingCallData]);
+    }, [socket, navigate, setIncomingCallData, handleCallAnsweredElsewhere, handleCallDeclinedElsewhere]);
 
     // --- NEW: Effect for handling WebRTC specific signaling ---
     useEffect(() => {

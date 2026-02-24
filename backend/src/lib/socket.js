@@ -113,6 +113,9 @@ io.on("connection", (socket) => {
   socket.on("answer-call", ({ to, answer, callId }) => {
     console.log(`[${new Date().toISOString()}] Relaying answer for ${callId} from ${userId} to ${to}`);
     io.to(to).emit("call-accepted", { from: userId, answer, callId });
+
+    // Notify other devices of the same user that the call was answered elsewhere
+    socket.to(userId).emit("call-answered-elsewhere", { callId });
   });
 
   // Decline: Relay decline from callee to caller's room
@@ -125,6 +128,9 @@ io.on("connection", (socket) => {
       console.error("Error updating call log to declined:", error);
     }
     io.to(to).emit("call-declined", { from: userId, callId });
+
+    // Notify other devices of the same user that the call was declined elsewhere
+    socket.to(userId).emit("call-declined-elsewhere", { callId });
   });
 
   // Hangup: Relay hangup to other peer's room

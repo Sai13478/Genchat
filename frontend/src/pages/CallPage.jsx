@@ -21,6 +21,10 @@ const CallPage = () => {
         toggleMute,
         isVideoEnabled,
         toggleVideo,
+        getOutputDevices,
+        availableOutputDevices,
+        selectedOutputDeviceId,
+        setAudioOutput,
     } = useCallStore();
     const { socket } = useSocket();
     const timer = useCallTimer();
@@ -55,13 +59,39 @@ const CallPage = () => {
 
     // Play remote audio for audio-only calls
     useEffect(() => {
-        if (remoteStream && remoteAudioRef.current) {
+        if (remoteStream && remoteAudioRef.current && callType !== "video") {
             remoteAudioRef.current.srcObject = remoteStream;
             remoteAudioRef.current.play().catch((err) => {
                 if (err.name !== "AbortError") console.error("Remote audio play error:", err);
             });
+        } else if (remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = null;
         }
-    }, [remoteStream]);
+    }, [remoteStream, callType]);
+
+    // Fetch output devices on mount
+    useEffect(() => {
+        getOutputDevices();
+    }, [getOutputDevices]);
+
+    // Apply audio output device selection
+    useEffect(() => {
+        const applySinkId = async (element, deviceId) => {
+            if (element && typeof element.setSinkId === 'function') {
+                try {
+                    await element.setSinkId(deviceId);
+                    console.log(`Audio output set to ${deviceId} for ${element.tagName}`);
+                } catch (error) {
+                    console.error(`Error setting sink ID for ${element.tagName}:`, error);
+                }
+            }
+        };
+
+        if (selectedOutputDeviceId) {
+            applySinkId(remoteAudioRef.current, selectedOutputDeviceId);
+            applySinkId(remoteVideoRef.current, selectedOutputDeviceId);
+        }
+    }, [selectedOutputDeviceId]);
 
     useEffect(() => {
         if (callState === "idle" || callState === "failed") {
@@ -164,6 +194,24 @@ const CallPage = () => {
                     >
                         <PhoneOff size={28} />
                     </button>
+
+                    {/* Output Device Selection */}
+                    {availableOutputDevices.length > 0 && (
+                        <div className="absolute -top-16 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-zinc-900/80 backdrop-blur-xl border border-white/10 px-4 py-2 rounded-full">
+                            <span className="text-xs text-zinc-400 whitespace-nowrap">Output:</span>
+                            <select
+                                value={selectedOutputDeviceId}
+                                onChange={(e) => setAudioOutput(e.target.value)}
+                                className="bg-transparent text-xs text-white focus:outline-none cursor-pointer max-w-[120px] truncate"
+                            >
+                                {availableOutputDevices.map(device => (
+                                    <option key={device.deviceId} value={device.deviceId} className="bg-zinc-800">
+                                        {device.label || `Device ${device.deviceId.slice(0, 5)}`}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                 </div>
             </div>
 

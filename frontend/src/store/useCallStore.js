@@ -27,6 +27,8 @@ const configuration = {
 
 export const useCallStore = create((set, get) => ({
     iceCandidateQueue: [],
+    availableOutputDevices: [],
+    selectedOutputDeviceId: "default",
 
     _processIceCandidateQueue: async () => {
         const { iceCandidateQueue } = get();
@@ -100,9 +102,15 @@ export const useCallStore = create((set, get) => ({
 
             set((state) => {
                 const currentStream = state.remoteStream || new MediaStream();
+
+                // Add the track to the stream if it's not already there
                 if (!currentStream.getTracks().find(t => t.id === event.track.id)) {
                     currentStream.addTrack(event.track);
+                    console.log(`Track ${event.track.id} (${event.track.kind}) added to remote stream.`);
                 }
+
+                // Force a new MediaStream object to trigger React re-renders if necessary, 
+                // but keep the same tracks.
                 return { remoteStream: new MediaStream(currentStream.getTracks()) };
             });
         };
@@ -150,13 +158,16 @@ export const useCallStore = create((set, get) => ({
         const { callType } = incomingCallData;
 
         try {
-            const videoConstraints = {
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
+            // Relaxed constraints for better compatibility
+            const videoConstraints = callType === "video" ? {
+                width: { ideal: 1280, max: 1920 },
+                height: { ideal: 720, max: 1080 },
                 frameRate: { ideal: 30 },
-            };
+                facingMode: "user"
+            } : false;
+
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: callType === "video" ? videoConstraints : false,
+                video: videoConstraints,
                 audio: true,
             });
 
@@ -381,5 +392,31 @@ export const useCallStore = create((set, get) => ({
         setTimeout(() => {
             get().resetCallState();
         }, 2000);
+    },
+
+    handleCallAnsweredElsewhere: () => {
+        console.log("Call answered on another device. Resetting state.");
+        get().resetCallState();
+    },
+
+    handleCallDeclinedElsewhere: () => {
+        console.log("Call declined on another device. Resetting state.");
+        get().resetCallState();
+    },
+
+    getOutputDevices: async () => {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
+            set({ availableOutputDevices: audioOutputs });
+        } catch (error) {
+            console.error("Error enumerating output devices:", error);
+        }
+    },
+
+    setAudioOutput: async (deviceId) => {
+        set({ selectedOutputDeviceId: deviceId });
+        // The actual logic to apply this to audio/video elements will be in the component
+        // because setSinkId is called on the DOM element.
     },
 }));
