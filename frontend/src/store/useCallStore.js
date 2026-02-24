@@ -6,7 +6,6 @@ let peerConnection;
 const configuration = {
     bundlePolicy: "max-bundle",
     rtcpMuxPolicy: "require",
-    iceCandidatePoolSize: 10,
     iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
@@ -29,7 +28,10 @@ const configuration = {
 export const useCallStore = create((set, get) => ({
     availableOutputDevices: [],
     selectedOutputDeviceId: "default",
-    socket: null, // Centralized socket reference
+    socket: null,
+    connectionStatus: "idle", // 'idle', 'connecting', 'connected', 'failed', 'disconnected'
+    iceStatus: "none", // 'none', 'gathering', 'complete'
+    signalingState: "stable",
 
     setSocket: (socket) => set({ socket }),
 
@@ -68,12 +70,15 @@ export const useCallStore = create((set, get) => ({
         peerConnection.onsignalingstatechange = () => {
             if (peerConnection) {
                 console.log(`Signaling state change: ${peerConnection.signalingState}`);
+                set({ signalingState: peerConnection.signalingState });
             }
         };
+
         peerConnection.onconnectionstatechange = () => {
             if (peerConnection) {
                 const state = peerConnection.connectionState;
                 console.log(`Connection state: ${state}`);
+                set({ connectionStatus: state });
                 if (state === "failed") {
                     console.error("WebRTC Connection failed. Check network/firewall.");
                     toast.error("Connection failed. Please check your internet or firewall.");
@@ -81,10 +86,17 @@ export const useCallStore = create((set, get) => ({
             }
         };
 
+        peerConnection.onicegatheringstatechange = () => {
+            if (peerConnection) {
+                console.log(`ICE Gathering state: ${peerConnection.iceGatheringState}`);
+                set({ iceStatus: peerConnection.iceGatheringState });
+            }
+        };
+
         peerConnection.oniceconnectionstatechange = async () => {
             if (peerConnection) {
                 const state = peerConnection.iceConnectionState;
-                console.log("ICE state:", state);
+                console.log("ICE Connection state:", state);
 
                 if (state === "failed") {
                     console.log("Restarting ICE...");
@@ -92,10 +104,10 @@ export const useCallStore = create((set, get) => ({
                         const offer = await peerConnection.createOffer({ iceRestart: true });
                         await peerConnection.setLocalDescription(offer);
 
-                        const { callee, caller, callId } = get();
+                        const { callee, caller, callId, socket } = get();
                         const otherUser = callee || caller;
 
-                        if (otherUser) {
+                        if (otherUser && socket) {
                             socket.emit("renegotiate-call", {
                                 to: otherUser._id,
                                 offer,

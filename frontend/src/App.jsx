@@ -110,6 +110,7 @@ function App() {
 
         // Listener for receiving ICE candidates from the other peer
         const onIceCandidate = ({ candidate }) => {
+            console.log(`Receiving ICE candidate from peer: ${candidate?.type || 'unknown'}`);
             handleNewIceCandidate(candidate);
         };
 

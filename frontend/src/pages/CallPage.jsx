@@ -25,6 +25,9 @@ const CallPage = () => {
         availableOutputDevices,
         selectedOutputDeviceId,
         setAudioOutput,
+        connectionStatus,
+        iceStatus,
+        signalingState
     } = useCallStore();
     const { socket } = useSocket();
     const timer = useCallTimer();
@@ -243,6 +246,7 @@ const CallPage = () => {
                             </select>
                         </div>
                     )}
+
                 </div>
             </div>
 
