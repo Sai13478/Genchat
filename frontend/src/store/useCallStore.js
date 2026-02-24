@@ -32,6 +32,7 @@ export const useCallStore = create((set, get) => ({
     connectionStatus: "idle", // 'idle', 'connecting', 'connected', 'failed', 'disconnected'
     iceStatus: "none", // 'none', 'gathering', 'complete'
     signalingState: "stable",
+    isInitialKickDone: false,
 
     setSocket: (socket) => set({ socket }),
 
@@ -79,6 +80,16 @@ export const useCallStore = create((set, get) => ({
                 const state = peerConnection.connectionState;
                 console.log(`Connection state: ${state}`);
                 set({ connectionStatus: state });
+
+                if (state === "connected" && !get().isInitialKickDone) {
+                    console.log("Connection established. Performing automated renegotiation kick...");
+                    set({ isInitialKickDone: true });
+                    // Small delay to ensure both sides are ready
+                    setTimeout(() => {
+                        get()._renegotiate();
+                    }, 500);
+                }
+
                 if (state === "failed") {
                     console.error("WebRTC Connection failed. Check network/firewall.");
                     toast.error("Connection failed. Please check your internet or firewall.");
@@ -185,6 +196,12 @@ export const useCallStore = create((set, get) => ({
 
         try {
             if (!peerConnection || peerConnection.signalingState === "closed") return;
+
+            // Allow browser some time to gather basic ICE candidates for bundling
+            console.log("Gathering initial ICE candidates before offer (200ms delay)...");
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            if (peerConnection.signalingState === "closed") return;
             console.log("Explicitly creating offer...");
             const offer = await peerConnection.createOffer();
             if (peerConnection.signalingState === "closed") return;
@@ -364,6 +381,7 @@ export const useCallStore = create((set, get) => ({
             isMuted: false,
             isVideoEnabled: false,
             iceCandidateQueue: [],
+            isInitialKickDone: false,
         });
     },
 
@@ -494,6 +512,13 @@ export const useCallStore = create((set, get) => ({
     _renegotiate: async () => {
         const { socket } = get();
         if (!peerConnection || !socket) return;
+
+        // Safety: Only renegotiate if state is stable
+        if (peerConnection.signalingState !== "stable") {
+            console.log("Renegotiation skipped: Signaling state is not stable.");
+            return;
+        }
+
         try {
             console.log("Starting formal renegotiation...");
             const offer = await peerConnection.createOffer();
