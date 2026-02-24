@@ -40,7 +40,7 @@ const ChatHeader = () => {
     };
 
     return (
-        <div className='flex items-center justify-between p-4 border-b border-white/20 bg-white/10 backdrop-blur-md'>
+        <div className='flex items-center justify-between p-4 border-b border-base-content/5 bg-base-100/10 backdrop-blur-md'>
             <div className='flex items-center gap-3'>
                 {/* Back button - visible only on mobile */}
                 <button

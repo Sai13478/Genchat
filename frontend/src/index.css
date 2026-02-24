@@ -4,11 +4,7 @@
 
 @layer utilities {
     .glassy {
-        @apply bg-white/40 backdrop-blur-2xl border border-white/40 shadow-glass ring-1 ring-white/20;
-    }
-
-    .glassy-dark {
-        @apply bg-slate-900/60 backdrop-blur-2xl border border-white/10 shadow-2xl;
+        @apply bg-base-100/30 backdrop-blur-2xl border border-base-content/10 shadow-glass ring-2 ring-white/5;
     }
 }
 

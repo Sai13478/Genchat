@@ -8,10 +8,10 @@ const HomePage = () => {
   const { selectedUser } = useChatStore();
 
   return (
-    <div className="h-screen bg-gradient-to-br from-base-200 via-base-300 to-primary/20 w-full overflow-hidden transition-all duration-700">
-      <div className="flex items-center justify-center pt-20 pb-4 px-4 h-full">
-        <div className="glassy rounded-3xl w-full h-full max-h-[calc(100dvh-8rem)] overflow-hidden">
-          <div className="flex h-full rounded-3xl overflow-hidden">
+    <div className="h-screen bg-gradient-to-br from-base-100 via-base-200 to-base-300 w-full overflow-hidden transition-all duration-700">
+      <div className="flex items-center justify-center p-4 md:p-8 h-full">
+        <div className="glassy rounded-[2.5rem] w-full h-full max-w-7xl max-h-[calc(100dvh-4rem)] overflow-hidden shadow-2xl transition-all duration-500">
+          <div className="flex h-full rounded-[2.5rem] overflow-hidden">
             {/* Mobile: show sidebar when no user selected, hide when chatting */}
             {/* Desktop: always show sidebar */}
             <div className={`${selectedUser ? "hidden md:flex" : "flex"} w-full md:w-1/3 md:max-w-sm`}>
