@@ -161,8 +161,7 @@ export const useCallStore = create((set, get) => ({
             // Relaxed constraints for better compatibility on all devices
             const videoConstraints = callType === "video" ? {
                 width: { ideal: 1280 },
-                height: { ideal: 720 },
-                facingMode: "user"
+                height: { ideal: 720 }
             } : false;
 
             console.log("Requesting getUserMedia with constraints:", { video: videoConstraints, audio: true });
@@ -207,11 +206,12 @@ export const useCallStore = create((set, get) => ({
         }
     },
 
-    handleCallAccepted: async (answer) => {
+    handleCallAccepted: async (answer, callId) => {
         if (!peerConnection) return;
         try {
+            console.log(`Call accepted. Syncing Call ID: ${callId}`);
             await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-            set({ callState: "connected", callAccepted: true, callStartTime: Date.now() });
+            set({ callState: "connected", callAccepted: true, callStartTime: Date.now(), callId });
 
             // Process queued candidates
             await get()._processIceCandidateQueue();

@@ -93,8 +93,8 @@ function App() {
         if (!socket) return;
 
         // Listener for when the callee accepts the call
-        const onCallAccepted = ({ answer }) => {
-            handleCallAccepted(answer);
+        const onCallAccepted = ({ answer, callId }) => {
+            handleCallAccepted(answer, callId);
         };
 
         // Listener for re-negotiation (e.g. screen share)
