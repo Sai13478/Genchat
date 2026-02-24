@@ -1,12 +1,49 @@
+import { useThemeStore } from "../store/useThemeStore";
+import { Send, Moon, Sun } from "lucide-react";
+import { useAuthStore } from "../store/useAuthStore";
+
+const PREVIEW_MESSAGES = [
+  { id: 1, content: "Hey! How's it going?", isSent: false },
+  { id: 2, content: "I'm doing great! Just working on some new features.", isSent: true },
+];
+
 const SettingsPage = () => {
+  const { theme, toggleTheme } = useThemeStore();
   const { registerPasskey } = useAuthStore();
 
   return (
     <div className="h-screen container mx-auto px-4 pt-20 max-w-5xl">
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-bold tracking-tight">Appearance & Settings</h2>
-          <p className="text-sm text-base-content/60">Manage your account and view the premium interface preview below.</p>
+          <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
+          <p className="text-sm text-base-content/60">Manage your interface appearance and account security.</p>
+        </div>
+
+        <div className="glassy p-6 rounded-3xl flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className={`p-3 rounded-2xl ${theme === "genchat-dark" ? "bg-primary/20 text-primary" : "bg-orange-100 text-orange-600"}`}>
+              {theme === "genchat-dark" ? <Moon size={24} /> : <Sun size={24} />}
+            </div>
+            <div>
+              <h3 className="font-bold text-lg">Dark Mode</h3>
+              <p className="text-sm text-base-content/60">Switch between light and dark premium aesthetics</p>
+            </div>
+          </div>
+          <button
+            onClick={toggleTheme}
+            className={`
+              relative inline-flex h-8 w-14 items-center rounded-full transition-all duration-500 outline-none ring-offset-2 focus:ring-2 focus:ring-primary/50
+              ${theme === "genchat-dark" ? "bg-primary" : "bg-slate-200"}
+            `}
+          >
+            <span className="sr-only">Toggle theme</span>
+            <span
+              className={`
+                inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-500
+                ${theme === "genchat-dark" ? "translate-x-7" : "translate-x-1"}
+              `}
+            />
+          </button>
         </div>
 
 
