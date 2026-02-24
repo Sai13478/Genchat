@@ -32,26 +32,27 @@ const NoChatSelected = () => {
   }, [socket]);
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-16 bg-base-100/5">
+    <div className="w-full h-full flex flex-col items-center justify-center p-16 bg-transparent">
       <div className="max-w-md text-center space-y-6">
         {/* Icon Display */}
         <div className="flex justify-center gap-4 mb-4">
           <div className="relative">
             <div
-              className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center
-             justify-center animate-bounce"
+              className="w-20 h-20 rounded-[2rem] bg-primary/10 flex items-center
+             justify-center shadow-2xl shadow-primary/20 transition-all duration-700 hover:scale-105"
             >
-              <MessageSquare className="w-8 h-8 text-primary" />
+              <MessageSquare className="w-10 h-10 text-primary" />
             </div>
           </div>
         </div>
 
         {/* Welcome Text */}
-        <h2 className="text-2xl font-bold">Welcome to Genchat</h2>
-        <p className="text-base-content/60">
-          Please choose a conversation from the sidebar to begin chatting.
-        </p>
-
+        <div className="space-y-2">
+          <h2 className="text-3xl font-bold tracking-tight text-base-content">Welcome to Genchat</h2>
+          <p className="text-base-content/50 text-base max-w-sm mx-auto">
+            Please choose a conversation from the sidebar to begin chatting.
+          </p>
+        </div>
       </div>
     </div>
   );

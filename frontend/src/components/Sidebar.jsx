@@ -47,38 +47,44 @@ const Sidebar = () => {
     };
 
     return (
-        <div className='flex flex-col w-full h-full p-4 overflow-hidden'>
-            <div className='flex items-center justify-between mb-4'>
-                <div className='flex items-center gap-2'>
-                    <img src={authUser.profilePic || "/avatar.png"} alt='User avatar' className='size-8 rounded-full border' />
-                    <p className="font-medium text-base-content">{authUser.username}<span className="text-xs opacity-50 ml-1">#{authUser.tag}</span></p>
+        <div className='flex flex-col w-full h-full p-6 overflow-hidden'>
+            <div className='flex items-center justify-between mb-8'>
+                <div className='flex items-center gap-3'>
+                    <div className="relative group">
+                        <img src={authUser.profilePic || "/avatar.png"} alt='User avatar' className='size-12 rounded-full border-2 border-primary/20 object-cover shadow-lg transition-all group-hover:border-primary/40' />
+                        <div className="absolute bottom-0 right-0 size-3 bg-success rounded-full border-2 border-base-100"></div>
+                    </div>
+                    <div className="flex flex-col">
+                        <p className="font-bold text-base-content text-lg leading-tight">{authUser.username}</p>
+                        <p className="text-xs text-base-content/40 font-medium">#{authUser.tag}</p>
+                    </div>
                 </div>
             </div>
 
             {/* Search bar */}
-            <form onSubmit={handleSearch} className='mb-4 space-y-2'>
-                <div className="flex gap-2">
+            <form onSubmit={handleSearch} className='mb-6'>
+                <div className="flex items-center gap-2 p-1.5 bg-base-200/50 rounded-xl border border-white/5 focus-within:border-primary/30 transition-all">
                     <div className="relative flex-1">
-                        <Search className='absolute left-2 top-1/2 -translate-y-1/2 size-3 text-gray-400' />
+                        <Search className='absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-base-content/30' />
                         <input
                             type='text'
-                            placeholder='Username'
+                            placeholder='Search user'
                             value={usernameQuery}
                             onChange={(e) => setUsernameQuery(e.target.value)}
-                            className='input input-xs input-bordered w-full pl-7'
+                            className='w-full bg-transparent text-sm pl-8 pr-2 py-1 outline-none text-base-content placeholder:text-base-content/20'
                         />
                     </div>
-                    <div className="flex items-center text-xs opacity-50">#</div>
+                    <div className="h-4 w-px bg-white/10"></div>
                     <input
                         type='text'
                         placeholder='Tag'
                         maxLength={4}
                         value={tagQuery}
                         onChange={(e) => setTagQuery(e.target.value.replace(/\D/g, ""))}
-                        className='input input-xs input-bordered w-16 text-center'
+                        className='w-12 bg-transparent text-xs text-center outline-none text-base-content/60 placeholder:text-base-content/20'
                     />
-                    <button type="submit" className="btn btn-xs btn-primary">
-                        {isSearching ? "..." : "Find"}
+                    <button type="submit" className="flex items-center justify-center size-7 rounded-lg bg-primary text-primary-content hover:bg-primary/90 transition-all shadow-md">
+                        {isSearching ? <span className="loading loading-spinner size-3"></span> : <Search className="size-3.5" />}
                     </button>
                 </div>
             </form>

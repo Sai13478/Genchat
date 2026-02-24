@@ -147,9 +147,9 @@ function App() {
     }
 
     return (
-        <div>
+        <div className="min-h-screen bg-base-200 transition-colors duration-500">
             <Navbar />
-            <div className='h-screen flex items-center justify-center'>
+            <main className='pt-16 min-h-[calc(100vh-64px)] flex items-center justify-center'>
                 <Routes>
                     <Route path='/' element={authUser ? <HomePage /> : <Navigate to={"/login"} />} />
                     <Route path='/signup' element={!authUser ? <SignUpPage /> : <Navigate to={"/"} />} />
@@ -162,7 +162,7 @@ function App() {
                 </Routes>
                 <Toaster />
                 <IncomingCallModal />
-            </div>
+            </main>
         </div>
     );
 }
