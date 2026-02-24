@@ -17,7 +17,10 @@ html,
 body {
     height: 100%;
     margin: 0;
+    font-family: 'SF Pro Display', 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     @apply bg-base-200 text-base-content antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* Premium Scrollbar */
