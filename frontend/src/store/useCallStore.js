@@ -8,16 +8,12 @@ const configuration = {
     iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:stun3.l.google.com:19302" },
-        { urls: "stun:stun4.l.google.com:19302" },
         {
-            urls: "turn:openrelay.metered.ca:80",
-            username: "openrelayproject",
-            credential: "openrelayproject",
-        },
-        {
-            urls: "turn:openrelay.metered.ca:443",
+            urls: [
+                "turn:openrelay.metered.ca:80",
+                "turn:openrelay.metered.ca:443",
+                "turn:openrelay.metered.ca:443?transport=tcp"
+            ],
             username: "openrelayproject",
             credential: "openrelayproject",
         },
@@ -62,10 +58,11 @@ export const useCallStore = create((set, get) => ({
         };
         peerConnection.onconnectionstatechange = () => {
             if (peerConnection) {
-                console.log(`Connection state: ${peerConnection.connectionState}`);
-                if (peerConnection.connectionState === "failed") {
+                const state = peerConnection.connectionState;
+                console.log(`Connection state: ${state}`);
+                if (state === "failed") {
                     console.error("WebRTC Connection failed. Check network/firewall.");
-                    // Optional: set a state to show "Connection poor/failed" to the user
+                    toast.error("Connection failed. Please check your internet or firewall.");
                 }
             }
         };
@@ -108,21 +105,22 @@ export const useCallStore = create((set, get) => ({
         };
 
         peerConnection.ontrack = (event) => {
-            console.log("Received remote track:", event.track.kind);
+            console.log(`Received remote track: ${event.track.kind}`);
 
-            set((state) => {
-                const currentStream = state.remoteStream || new MediaStream();
-
-                // Add the track to the stream if it's not already there
-                if (!currentStream.getTracks().find(t => t.id === event.track.id)) {
-                    currentStream.addTrack(event.track);
-                    console.log(`Track ${event.track.id} (${event.track.kind}) added to remote stream.`);
-                }
-
-                // Force a new MediaStream object to trigger React re-renders if necessary, 
-                // but keep the same tracks.
-                return { remoteStream: new MediaStream(currentStream.getTracks()) };
-            });
+            if (event.streams && event.streams[0]) {
+                const remoteStream = event.streams[0];
+                console.log(`Using stream from event. Tracks: ${remoteStream.getTracks().length}`);
+                set({ remoteStream });
+            } else {
+                set((state) => {
+                    const currentStream = state.remoteStream || new MediaStream();
+                    if (!currentStream.getTracks().find(t => t.id === event.track.id)) {
+                        currentStream.addTrack(event.track);
+                        console.log(`Track ${event.track.id} (${event.track.kind}) added to manual remote stream.`);
+                    }
+                    return { remoteStream: new MediaStream(currentStream.getTracks()) };
+                });
+            }
         };
 
         peerConnection.onicecandidate = (event) => {
@@ -342,7 +340,7 @@ export const useCallStore = create((set, get) => ({
             set({ isVideoEnabled: newVideoState });
         }
     },
-    toggleScreenShare: async () => {
+    toggleScreenShare: async (socket) => {
         const { isScreenSharing, localStream, callType } = get();
 
         if (callType !== "video" || !peerConnection) {
@@ -392,7 +390,7 @@ export const useCallStore = create((set, get) => ({
                 }
 
                 screenTrack.onended = () => {
-                    if (get().isScreenSharing) get().toggleScreenShare();
+                    if (get().isScreenSharing) get().toggleScreenShare(socket);
                 };
 
                 localStream.getVideoTracks().forEach((track) => track.stop());

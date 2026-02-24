@@ -154,15 +154,23 @@ const CallPage = () => {
             </div>
 
             {/* Remote Stream Content Area */}
-            <div className="flex-1 relative flex items-center justify-center p-4 sm:p-8 pt-44">
+            <div className="flex-1 relative flex items-center justify-center p-4 sm:p-8 pt-20">
                 {callType === "video" && remoteStream ? (
                     <div className="w-full h-full relative flex items-center justify-center overflow-hidden rounded-3xl bg-black/40 shadow-inner">
                         <video
                             ref={remoteVideoRef}
                             autoPlay
                             playsInline
-                            className='max-w-full max-h-full object-contain rounded-2xl shadow-2xl transition-all duration-700'
+                            className='max-w-full max-h-full object-contain rounded-2xl shadow-2xl transition-all duration-700 bg-black'
                         />
+                        {remoteStream.getVideoTracks().length === 0 && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-[#0b141a]">
+                                <div className="w-48 h-48 rounded-full ring-4 ring-emerald-500/20 overflow-hidden">
+                                    <img src={callee?.profilePic || caller?.profilePic || "/avatar.png"} className="w-full h-full object-cover opacity-50" />
+                                </div>
+                                <div className="absolute bottom-1/4 text-zinc-400 font-medium animate-pulse">Waiting for video...</div>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className='relative'>
@@ -204,7 +212,7 @@ const CallPage = () => {
 
                     {callType === "video" && (
                         <button
-                            onClick={toggleScreenShare}
+                            onClick={() => toggleScreenShare(socket)}
                             className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${isScreenSharing ? 'bg-emerald-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
                         >
                             {isScreenSharing ? <ScreenShareOff size={24} /> : <ScreenShare size={24} />}
