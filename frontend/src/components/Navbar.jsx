@@ -7,7 +7,7 @@ const Navbar = () => {
 
   return (
     <header
-      className="bg-base-100/60 border-b border-base-content/5 fixed w-full top-0 z-40 
+      className="bg-base-100/60 border-b border-base-content/10 fixed w-full top-0 z-40 
     backdrop-blur-2xl transition-all duration-500"
     >
       <div className="container mx-auto px-4 h-16">
@@ -17,7 +17,7 @@ const Navbar = () => {
               <div className="size-9 rounded-lg bg-primary/10 flex items-center justify-center">
                 <MessageSquare className="w-5 h-5 text-primary" />
               </div>
-              <h1 className="text-lg font-bold">GenChat</h1>
+              <h1 className="text-lg font-bold text-base-content">GenChat</h1>
             </Link>
           </div>
 

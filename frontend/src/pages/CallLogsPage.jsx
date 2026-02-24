@@ -56,62 +56,56 @@ const CallLogsPage = () => {
     }, [socket, addCallLog]);
 
     return (
-        <div className='flex flex-col h-screen bg-gray-100 dark:bg-gray-900 w-full'>
-            <div className='bg-white dark:bg-gray-800 shadow-md p-4'>
-                <h1 className='text-2xl font-bold text-gray-800 dark:text-gray-200 flex items-center'>
-                    <Clock className='mr-2' /> Call History
+        <div className='flex flex-col h-screen bg-base-200 w-full transition-colors duration-500'>
+            <div className='bg-base-100/40 backdrop-blur-xl border-b border-base-content/10 p-4 pt-20'>
+                <h1 className='text-2xl font-bold text-base-content flex items-center'>
+                    <Clock className='mr-2 size-6 text-primary' /> Call History
                 </h1>
             </div>
 
-            <div className='flex-1 overflow-y-auto p-4'>
+            <div className='flex-1 overflow-y-auto p-4 space-y-4'>
                 {loading && (
                     <div className='flex justify-center items-center h-full'>
-                        <span className='loading loading-spinner loading-lg'></span>
+                        <span className='loading loading-spinner loading-lg text-primary'></span>
                     </div>
                 )}
 
                 {!loading && callLogs.length === 0 && (
-                    <div className='text-center text-gray-500 dark:text-gray-400 mt-10'>
-                        <p>No call logs found.</p>
-                        <p>Your call history will appear here.</p>
+                    <div className='text-center text-base-content/50 mt-10'>
+                        <p className="text-lg">No call logs found.</p>
+                        <p className="text-sm">Your call history will appear here.</p>
                     </div>
                 )}
 
                 {!loading && callLogs.length > 0 && (
-                    <ul className='space-y-4'>
+                    <ul className='space-y-3 max-w-4xl mx-auto'>
                         {callLogs.map((log) => {
-                            // Defensive check to prevent crashes if data is not populated
-                            if (!log.caller?._id || !log.callee?._id) {
-                                return null;
-                            }
+                            if (!log.caller?._id || !log.callee?._id) return null;
 
                             const otherUser = log.receiverId || (authUser?._id === log.caller._id ? log.callee : log.caller);
                             const isOutgoing = authUser?._id === log.caller._id;
-
-                            // *** FIX: Use log.status to determine if a call was missed or declined ***
                             const wasMissedOrDeclined = log.status === "missed" || log.status === "declined";
                             const callDuration = formatDuration(log.duration);
 
                             return (
-                                <li key={log._id} className='bg-white dark:bg-gray-800 p-4 rounded-lg shadow flex items-center justify-between'>
-                                    <div className='flex items-center'>
-                                        <div className={`p-3 rounded-full mr-4 ${wasMissedOrDeclined ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"}`}>
+                                <li key={log._id} className='glassy p-4 rounded-2xl flex items-center justify-between transition-all hover:scale-[1.01]'>
+                                    <div className='flex items-center gap-4'>
+                                        <div className={`p-3 rounded-full ${wasMissedOrDeclined ? "bg-error/10 text-error" : "bg-success/10 text-success"}`}>
                                             <Phone size={20} />
                                         </div>
                                         <div>
-                                            <p className='font-semibold text-gray-800 dark:text-gray-200'>
+                                            <p className='font-bold text-base-content'>
                                                 {otherUser?.username || "Unknown User"}
-                                                {otherUser?.tag && <span className="text-xs opacity-50 ml-1">#{otherUser.tag}</span>}
+                                                {otherUser?.tag && <span className="text-xs opacity-40 ml-1">#{otherUser.tag}</span>}
                                             </p>
-                                            <div className='flex items-center text-sm text-gray-500 dark:text-gray-400'>
-                                                {isOutgoing ? <ArrowUpRight size={16} className="mr-1" /> : <ArrowDownLeft size={16} className="mr-1" />}
+                                            <div className='flex items-center text-xs text-base-content/60 mt-0.5'>
+                                                {isOutgoing ? <ArrowUpRight size={14} className="mr-1 text-primary" /> : <ArrowDownLeft size={14} className="mr-1 text-secondary" />}
                                                 <span>{new Date(log.createdAt).toLocaleString()}</span>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* *** FIX: Display the correct status or duration *** */}
-                                    <div className={`text-sm capitalize font-medium ${wasMissedOrDeclined ? "text-red-500" : "text-gray-500 dark:text-gray-400"}`}>
+                                    <div className={`text-sm font-semibold px-3 py-1 rounded-lg ${wasMissedOrDeclined ? "bg-error/10 text-error" : "bg-base-content/5 text-base-content/70"}`}>
                                         {log.status === 'answered' ? callDuration : log.status}
                                     </div>
                                 </li>

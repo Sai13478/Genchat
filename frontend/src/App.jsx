@@ -26,8 +26,13 @@ function App() {
     const { authUser, isCheckingAuth, checkAuth } = useAuthStore();
     const { getFriendRequests, subscribeToMessages, unsubscribeFromMessages } = useChatStore();
     const { socket } = useSocket();
-    const { theme } = useThemeStore();
+    const { theme, initializeTheme } = useThemeStore();
     const navigate = useNavigate();
+
+    // Initialize theme on mount
+    useEffect(() => {
+        initializeTheme();
+    }, [initializeTheme]);
 
     // Start global message listening for notifications
     useListenMessages();
@@ -142,7 +147,7 @@ function App() {
     }
 
     return (
-        <div data-theme={theme}>
+        <div>
             <Navbar />
             <div className='h-screen flex items-center justify-center'>
                 <Routes>
