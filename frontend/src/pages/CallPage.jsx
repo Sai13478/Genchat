@@ -120,7 +120,7 @@ const CallPage = () => {
     const getCallState = () => useCallStore.getState().callState;
 
     return (
-        <div className='relative w-screen h-screen bg-[#0b141a] overflow-hidden flex flex-col text-white pt-16'>
+        <div className='relative w-screen h-[100dvh] bg-[#0b141a] overflow-hidden flex flex-col text-white'>
             {/* Background Blur Overlay for Audio Calls */}
             {callType !== "video" && (
                 <div className="absolute inset-0 opacity-20 blur-3xl scale-150 pointer-events-none">
@@ -154,7 +154,7 @@ const CallPage = () => {
             </div>
 
             {/* Remote Stream Content Area */}
-            <div className="flex-1 relative flex items-center justify-center p-4 sm:p-8">
+            <div className="flex-1 relative flex items-center justify-center p-4 sm:p-8 pt-44">
                 {callType === "video" && remoteStream ? (
                     <div className="w-full h-full relative flex items-center justify-center overflow-hidden rounded-3xl bg-black/40 shadow-inner">
                         <video

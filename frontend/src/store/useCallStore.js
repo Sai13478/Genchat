@@ -62,7 +62,17 @@ export const useCallStore = create((set, get) => ({
         };
         peerConnection.onconnectionstatechange = () => {
             if (peerConnection) {
-                console.log(`Connection state change: ${peerConnection.connectionState}`);
+                console.log(`Connection state: ${peerConnection.connectionState}`);
+                if (peerConnection.connectionState === "failed") {
+                    console.error("WebRTC Connection failed. Check network/firewall.");
+                    // Optional: set a state to show "Connection poor/failed" to the user
+                }
+            }
+        };
+
+        peerConnection.oniceconnectionstatechange = () => {
+            if (peerConnection) {
+                console.log(`ICE Connection state: ${peerConnection.iceConnectionState}`);
             }
         };
 
@@ -158,14 +168,22 @@ export const useCallStore = create((set, get) => ({
         const { callType } = incomingCallData;
 
         try {
-            // Maximum compatibility for integrated laptop cameras: just use "true"
-            const videoConstraints = callType === "video" ? true : false;
-
-            console.log("Requesting getUserMedia with constraints:", { video: videoConstraints, audio: true });
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: videoConstraints,
+            // EXTREME RELAXATION: Just use "true" to ensure any camera works
+            const constraints = {
+                video: callType === "video",
                 audio: true,
-            });
+            };
+
+            console.log("Answering call. Requesting media with:", constraints);
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            // Safety check: Did we cancel/hangup while waiting for camera?
+            if (get().callState === "idle") {
+                console.log("Call aborted while waiting for media.");
+                stream.getTracks().forEach(t => t.stop());
+                return;
+            }
+
             console.log("Successfully obtained local stream.");
 
             set({
@@ -356,10 +374,8 @@ export const useCallStore = create((set, get) => ({
                 const newStream = new MediaStream([cameraTrack, ...localStream.getAudioTracks()]);
                 set({ localStream: newStream, isScreenSharing: false });
 
-                // Manually trigger a formal renegotiation to ensure remote peer's decoder updates
-                if (peerConnection.onnegotiationneeded) {
-                    await peerConnection.onnegotiationneeded();
-                }
+                // Formal renegotiation for screen share stop
+                await get()._renegotiate(socket);
             } catch (error) {
                 console.error("Error switching back to camera:", error);
                 toast.error("Could not switch back to camera. Please check permissions.");
@@ -381,13 +397,12 @@ export const useCallStore = create((set, get) => ({
 
                 localStream.getVideoTracks().forEach((track) => track.stop());
 
+                // Update local stream with screen track and existing audio
                 const newStream = new MediaStream([screenTrack, ...localStream.getAudioTracks()]);
                 set({ localStream: newStream, isScreenSharing: true });
 
-                // Manually trigger a formal renegotiation to ensure remote peer's decoder updates
-                if (peerConnection.onnegotiationneeded) {
-                    await peerConnection.onnegotiationneeded();
-                }
+                // Formal renegotiation for screen share start
+                await get()._renegotiate(socket);
             } catch (error) {
                 console.error("Error starting screen share:", error);
                 if (error.name !== "NotAllowedError" && error.name !== "NotFoundError") {
@@ -425,7 +440,28 @@ export const useCallStore = create((set, get) => ({
 
     setAudioOutput: async (deviceId) => {
         set({ selectedOutputDeviceId: deviceId });
-        // The actual logic to apply this to audio/video elements will be in the component
-        // because setSinkId is called on the DOM element.
+    },
+
+    // New helper for formal renegotiation
+    _renegotiate: async (socket) => {
+        if (!peerConnection) return;
+        try {
+            console.log("Starting formal renegotiation...");
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+
+            const { callee, caller, callId } = get();
+            const otherUser = callee || caller;
+            if (otherUser) {
+                console.log(`Emitting renegotiation offer to ${otherUser._id}`);
+                socket.emit("renegotiate-call", {
+                    to: otherUser._id,
+                    offer: offer,
+                    callId
+                });
+            }
+        } catch (err) {
+            console.error("Renegotiation failed:", err);
+        }
     },
 }));
