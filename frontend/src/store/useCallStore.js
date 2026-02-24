@@ -125,6 +125,7 @@ export const useCallStore = create((set, get) => ({
                         currentStream.addTrack(event.track);
                         console.log(`Track ${event.track.id} (${event.track.kind}) added to manual remote stream.`);
                     }
+                    // Re-create stream to force state update
                     return { remoteStream: new MediaStream(currentStream.getTracks()) };
                 });
             }
@@ -135,7 +136,7 @@ export const useCallStore = create((set, get) => ({
                 console.log("ICE →", event.candidate.type, event.candidate.protocol);
 
                 const { callee, caller, callId } = get();
-                const otherUser = get().callState === "calling" ? callee : caller;
+                const otherUser = callee || caller;
                 if (otherUser) {
                     socket.emit("ice-candidate", {
                         to: otherUser._id,
@@ -156,21 +157,25 @@ export const useCallStore = create((set, get) => ({
             callId: callDetails.callId,
         }),
 
-    initiateCall: async (callee, callType) => {
+    initiateCall: async (callee, callType, stream = null) => {
         set({ callState: "calling", callee, callType, isVideoEnabled: callType === "video" });
-        const { socket, localStream } = get();
+        const { socket } = get();
+        const localStream = stream || get().localStream;
 
         get()._createPeerConnection();
 
-        if (localStream) {
+        if (localStream && peerConnection) {
+            console.log(`Adding ${localStream.getTracks().length} tracks to peer connection (Caller).`);
             localStream.getTracks().forEach((track) => {
                 peerConnection.addTrack(track, localStream);
             });
         }
 
         try {
+            if (!peerConnection || peerConnection.signalingState === "closed") return;
             console.log("Explicitly creating offer...");
             const offer = await peerConnection.createOffer();
+            if (peerConnection.signalingState === "closed") return;
             await peerConnection.setLocalDescription(offer);
 
             if (socket) {
