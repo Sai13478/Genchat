@@ -1,3 +1,39 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer utilities {
+    .glassy {
+        @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-xl;
+    }
+    .glassy-dark {
+        @apply bg-slate-900/70 backdrop-blur-xl border border-white/10 shadow-xl;
+    }
+}
+
+/* Smooth transitions for theme feel */
+* {
+    @apply transition-colors duration-300;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  @apply bg-base-200 text-base-content antialiased;
+}
+
+/* Premium Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    @apply bg-transparent;
+}
+::-webkit-scrollbar-thumb {
+    @apply bg-primary/20 rounded-full hover:bg-primary/40 transition-all;
+}
+
+::selection {
+    @apply bg-primary/20 text-primary;
+}
