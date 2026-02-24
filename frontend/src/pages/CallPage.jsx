@@ -103,8 +103,23 @@ const CallPage = () => {
         hangup(socket);
     };
 
+    // --- CLEANUP ON UNMOUNT ---
+    // This ensures that if the user navigates away (e.g., via Navbar),
+    // the camera is turned off and the other peer is notified.
+    useEffect(() => {
+        return () => {
+            if (getCallState() !== "idle") {
+                console.log("CallPage unmounting: performing cleanup.");
+                hangup(socket);
+            }
+        };
+    }, [socket, hangup]);
+
+    // Helper to check state inside cleanup without making callState a dependency
+    const getCallState = () => useCallStore.getState().callState;
+
     return (
-        <div className='relative w-screen h-screen bg-[#0b141a] overflow-hidden flex flex-col text-white'>
+        <div className='relative w-screen h-screen bg-[#0b141a] overflow-hidden flex flex-col text-white pt-16'>
             {/* Background Blur Overlay for Audio Calls */}
             {callType !== "video" && (
                 <div className="absolute inset-0 opacity-20 blur-3xl scale-150 pointer-events-none">
@@ -138,9 +153,16 @@ const CallPage = () => {
             </div>
 
             {/* Remote Stream Content Area */}
-            <div className="flex-1 relative flex items-center justify-center p-4">
+            <div className="flex-1 relative flex items-center justify-center p-4 sm:p-8">
                 {callType === "video" && remoteStream ? (
-                    <video ref={remoteVideoRef} autoPlay playsInline className='w-full h-full object-contain rounded-2xl shadow-2xl' />
+                    <div className="w-full h-full relative flex items-center justify-center overflow-hidden rounded-3xl bg-black/40 shadow-inner">
+                        <video
+                            ref={remoteVideoRef}
+                            autoPlay
+                            playsInline
+                            className='max-w-full max-h-full object-contain rounded-2xl shadow-2xl transition-all duration-700'
+                        />
+                    </div>
                 ) : (
                     <div className='relative'>
                         <div className={`w-48 h-48 rounded-full ring-4 ring-offset-8 ring-offset-[#0b141a] transition-all duration-500 overflow-hidden shadow-2xl ${isSpeaking ? "ring-emerald-500 scale-105" : "ring-emerald-500/20"}`}>
@@ -154,8 +176,8 @@ const CallPage = () => {
 
                 {/* Local Video Preview (Picture in Picture) */}
                 {callType === "video" && localStream && (
-                    <div className="absolute bottom-32 right-6 w-32 h-44 sm:w-40 sm:h-56 overflow-hidden rounded-xl border-2 border-white/20 shadow-2xl z-20 animate-in zoom-in duration-500">
-                        <video ref={localVideoRef} autoPlay playsInline muted className='w-full h-full object-cover mirror' />
+                    <div className="absolute bottom-32 right-6 sm:right-10 w-32 h-44 sm:w-48 sm:h-64 overflow-hidden rounded-2xl border-2 border-white/30 shadow-2xl z-20 animate-in zoom-in slide-in-from-right duration-700 bg-black">
+                        <video ref={localVideoRef} autoPlay playsInline muted className='w-full h-full object-contain mirror scale-x-[-1]' />
                     </div>
                 )}
             </div>
