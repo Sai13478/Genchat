@@ -5,11 +5,15 @@ let peerConnection;
 let makingOffer = false;
 
 const configuration = {
-    iceTransportPolicy: "relay", // Force TURN to bypass restrictive firewalls
     bundlePolicy: "max-bundle",
     rtcpMuxPolicy: "require",
-    iceCandidatePoolSize: 0, // Disable pooling for stability
+    iceCandidatePoolSize: 10,
     iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun3.l.google.com:19302" },
+        { urls: "stun:stun4.l.google.com:19302" },
         {
             urls: [
                 "turn:openrelay.metered.ca:80",
@@ -24,9 +28,11 @@ const configuration = {
 };
 
 export const useCallStore = create((set, get) => ({
-    iceCandidateQueue: [],
     availableOutputDevices: [],
     selectedOutputDeviceId: "default",
+    socket: null, // Centralized socket reference
+
+    setSocket: (socket) => set({ socket }),
 
     _processIceCandidateQueue: async () => {
         const { iceCandidateQueue } = get();
@@ -43,7 +49,13 @@ export const useCallStore = create((set, get) => ({
         set({ iceCandidateQueue: [] });
     },
 
-    _createPeerConnection: (socket) => {
+    _createPeerConnection: () => {
+        const { socket } = get();
+        if (!socket) {
+            console.error("Cannot create peer connection: socket not found.");
+            return;
+        }
+
         if (peerConnection) {
             console.log("Closing old peer connection.");
             peerConnection.close();
@@ -173,9 +185,9 @@ export const useCallStore = create((set, get) => ({
             callId: callDetails.callId,
         }),
 
-    initiateCall: async (callee, socket, callType) => {
+    initiateCall: async (callee, callType) => {
         set({ callState: "calling", callee, callType, isVideoEnabled: callType === "video" });
-        get()._createPeerConnection(socket);
+        get()._createPeerConnection();
 
         const { localStream } = get();
         if (localStream) {
@@ -185,7 +197,7 @@ export const useCallStore = create((set, get) => ({
         }
     },
 
-    answerCall: async (socket) => {
+    answerCall: async () => {
         const { incomingCallData } = get();
         if (!incomingCallData) return;
 
@@ -219,7 +231,7 @@ export const useCallStore = create((set, get) => ({
                 callStartTime: Date.now(),
             });
 
-            get()._createPeerConnection(socket);
+            get()._createPeerConnection();
 
             await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingCallData.offer));
 
@@ -237,11 +249,14 @@ export const useCallStore = create((set, get) => ({
             const answer = await peerConnection.createAnswer();
             await peerConnection.setLocalDescription(answer);
 
-            socket.emit("answer-call", { to: incomingCallData.from._id, answer, callId: incomingCallData.callId });
+            const { socket } = get();
+            if (socket) {
+                socket.emit("answer-call", { to: incomingCallData.from._id, answer, callId: incomingCallData.callId });
+            }
         } catch (error) {
             console.error("Error answering call:", error);
             toast.error("Could not answer call. Please allow camera and microphone access.");
-            get().declineCall(socket);
+            get().declineCall();
         }
     },
 
@@ -259,8 +274,9 @@ export const useCallStore = create((set, get) => ({
         }
     },
 
-    handleRenegotiation: async (offer, socket) => {
-        if (!peerConnection) return;
+    handleRenegotiation: async (offer) => {
+        const { socket } = get();
+        if (!peerConnection || !socket) return;
         try {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
             await get()._processIceCandidateQueue();
@@ -290,17 +306,18 @@ export const useCallStore = create((set, get) => ({
     },
 
 
-    declineCall: (socket) => {
-        const { incomingCallData } = get();
-        if (incomingCallData) {
+    declineCall: () => {
+        const { incomingCallData, socket } = get();
+        if (incomingCallData && socket) {
             socket.emit("decline-call", { to: incomingCallData.from._id, callId: incomingCallData.callId });
         }
         // Use hangup for cleanup, but don't emit a hangup event since it's a decline
-        get().hangup(socket, false);
+        get().hangup(false);
     },
 
-    hangup: (socket, shouldEmit = true) => {
-        if (shouldEmit) {
+    hangup: (shouldEmit = true) => {
+        const { socket } = get();
+        if (shouldEmit && socket) {
             const { callee, caller, callId } = get();
             const otherUser = callee || caller;
             if (otherUser) {
@@ -366,7 +383,7 @@ export const useCallStore = create((set, get) => ({
             set({ isVideoEnabled: newVideoState });
         }
     },
-    toggleScreenShare: async (socket) => {
+    toggleScreenShare: async () => {
         const { isScreenSharing, localStream, callType } = get();
 
         if (callType !== "video" || !peerConnection) {
@@ -399,7 +416,7 @@ export const useCallStore = create((set, get) => ({
                 set({ localStream: newStream, isScreenSharing: false });
 
                 // Formal renegotiation for screen share stop
-                await get()._renegotiate(socket);
+                await get()._renegotiate();
             } catch (error) {
                 console.error("Error switching back to camera:", error);
                 toast.error("Could not switch back to camera. Please check permissions.");
@@ -416,7 +433,7 @@ export const useCallStore = create((set, get) => ({
                 }
 
                 screenTrack.onended = () => {
-                    if (get().isScreenSharing) get().toggleScreenShare(socket);
+                    if (get().isScreenSharing) get().toggleScreenShare();
                 };
 
                 localStream.getVideoTracks().forEach((track) => track.stop());
@@ -426,7 +443,7 @@ export const useCallStore = create((set, get) => ({
                 set({ localStream: newStream, isScreenSharing: true });
 
                 // Formal renegotiation for screen share start
-                await get()._renegotiate(socket);
+                await get()._renegotiate();
             } catch (error) {
                 console.error("Error starting screen share:", error);
                 if (error.name !== "NotAllowedError" && error.name !== "NotFoundError") {
@@ -467,8 +484,9 @@ export const useCallStore = create((set, get) => ({
     },
 
     // New helper for formal renegotiation
-    _renegotiate: async (socket) => {
-        if (!peerConnection) return;
+    _renegotiate: async () => {
+        const { socket } = get();
+        if (!peerConnection || !socket) return;
         try {
             console.log("Starting formal renegotiation...");
             const offer = await peerConnection.createOffer();

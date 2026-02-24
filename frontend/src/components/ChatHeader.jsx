@@ -31,7 +31,7 @@ const ChatHeader = () => {
             });
             setLocalStream(stream);
 
-            initiateCall(selectedUser, socket, callType);
+            initiateCall(selectedUser, callType);
             navigate("/call");
         } catch (error) {
             toast.error("Could not start call. Please allow camera and microphone access.");

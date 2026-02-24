@@ -61,6 +61,9 @@ function App() {
     useEffect(() => {
         if (!socket) return;
 
+        // Synchronize socket with call store for reliable signaling
+        useCallStore.getState().setSocket(socket);
+
         const handleIncomingCall = (data) => {
             setIncomingCallData(data);
         };
@@ -102,7 +105,7 @@ function App() {
 
         // Listener for re-negotiation (e.g. screen share)
         const onRenegotiateCall = ({ offer }) => {
-            handleRenegotiation(offer, socket);
+            handleRenegotiation(offer);
         };
 
         // Listener for receiving ICE candidates from the other peer
@@ -112,7 +115,7 @@ function App() {
 
         // Listener for when the other user hangs up
         const onHangup = () => {
-            hangup(socket); // This will reset the call state and clean up connections
+            hangup(); // This will reset the call state and clean up connections
         };
 
         socket.on("call-accepted", onCallAccepted);

@@ -37,12 +37,12 @@ const IncomingCallModal = () => {
     }
 
     const handleAccept = () => {
-        answerCall(socket);
+        answerCall();
         navigate("/call");
     };
 
     const handleDecline = () => {
-        declineCall(socket);
+        declineCall();
     };
 
     const { from, callType } = incomingCallData;

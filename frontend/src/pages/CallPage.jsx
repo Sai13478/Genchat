@@ -101,7 +101,7 @@ const CallPage = () => {
     }, [callState, navigate]);
 
     const handleHangup = () => {
-        hangup(socket);
+        hangup();
     };
 
     // --- CLEANUP ON UNMOUNT ---
@@ -111,7 +111,7 @@ const CallPage = () => {
         return () => {
             if (getCallState() !== "idle") {
                 console.log("CallPage unmounting: performing cleanup.");
-                hangup(socket);
+                hangup();
             }
         };
     }, [socket, hangup]);
@@ -212,7 +212,7 @@ const CallPage = () => {
 
                     {callType === "video" && (
                         <button
-                            onClick={() => toggleScreenShare(socket)}
+                            onClick={() => toggleScreenShare()}
                             className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${isScreenSharing ? 'bg-emerald-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
                         >
                             {isScreenSharing ? <ScreenShareOff size={24} /> : <ScreenShare size={24} />}
