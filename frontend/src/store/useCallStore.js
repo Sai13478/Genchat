@@ -158,18 +158,19 @@ export const useCallStore = create((set, get) => ({
         const { callType } = incomingCallData;
 
         try {
-            // Relaxed constraints for better compatibility
+            // Relaxed constraints for better compatibility on all devices
             const videoConstraints = callType === "video" ? {
-                width: { ideal: 1280, max: 1920 },
-                height: { ideal: 720, max: 1080 },
-                frameRate: { ideal: 30 },
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
                 facingMode: "user"
             } : false;
 
+            console.log("Requesting getUserMedia with constraints:", { video: videoConstraints, audio: true });
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: videoConstraints,
                 audio: true,
             });
+            console.log("Successfully obtained local stream.");
 
             set({
                 localStream: stream,
@@ -188,8 +189,10 @@ export const useCallStore = create((set, get) => ({
             await get()._processIceCandidateQueue();
 
             if (stream) {
+                console.log(`Adding ${stream.getTracks().length} tracks to peer connection.`);
                 stream.getTracks().forEach((track) => {
                     peerConnection.addTrack(track, stream);
+                    console.log(`Added ${track.kind} track.`);
                 });
             }
 

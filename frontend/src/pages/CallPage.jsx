@@ -49,6 +49,7 @@ const CallPage = () => {
     useEffect(() => {
         let isMounted = true;
         if (remoteStream && remoteVideoRef.current) {
+            console.log(`Assigning remote stream to video element. Tracks: ${remoteStream.getTracks().length}`);
             remoteVideoRef.current.srcObject = remoteStream;
             remoteVideoRef.current.play().catch((err) => {
                 if (err.name !== "AbortError") console.error("Remote video play error:", err);
@@ -177,7 +178,7 @@ const CallPage = () => {
                 {/* Local Video Preview (Picture in Picture) */}
                 {callType === "video" && localStream && (
                     <div className="absolute bottom-32 right-6 sm:right-10 w-32 h-44 sm:w-48 sm:h-64 overflow-hidden rounded-2xl border-2 border-white/30 shadow-2xl z-20 animate-in zoom-in slide-in-from-right duration-700 bg-black">
-                        <video ref={localVideoRef} autoPlay playsInline muted className='w-full h-full object-contain mirror scale-x-[-1]' />
+                        <video ref={localVideoRef} autoPlay playsInline muted className='w-full h-full object-contain video-mirror' />
                     </div>
                 )}
             </div>
@@ -238,7 +239,7 @@ const CallPage = () => {
             </div>
 
             <style jsx>{`
-                .mirror { transform: scaleX(-1); }
+                .video-mirror { transform: scaleX(-1); }
             `}</style>
         </div>
     );
