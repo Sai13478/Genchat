@@ -8,8 +8,11 @@ const HomePage = () => {
   const { selectedUser } = useChatStore();
 
   return (
-    <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-base-100 via-primary/5 to-secondary/10 w-full overflow-hidden transition-all duration-700 relative">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(59,130,246,0.1),transparent)] pointer-events-none"></div>
+    <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/20 w-full overflow-hidden transition-all duration-700 relative">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(59,130,246,0.1),transparent)] pointer-events-none animate-pulse"></div>
+      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none"></div>
+
       <div className="flex items-center justify-center p-4 md:p-6 h-full relative z-10">
         <div className="glassy rounded-3xl w-full h-full max-w-7xl max-h-[850px] overflow-hidden shadow-2xl border border-white/5">
           <div className="flex h-full rounded-3xl overflow-hidden">
@@ -21,7 +24,7 @@ const HomePage = () => {
 
             {/* Mobile: show chat when user selected, hide when no user */}
             {/* Desktop: always show chat area */}
-            <div className={`${selectedUser ? "flex" : "hidden md:flex"} flex-1`}>
+            <div className={`${selectedUser ? "flex" : "hidden md:flex"} flex-1 overflow-hidden`}>
               {!selectedUser ? <NoChatSelected /> : <ChatContainer />}
             </div>
           </div>
