@@ -56,29 +56,43 @@ const CallLogsPage = () => {
     }, [socket, addCallLog]);
 
     return (
-        <div className='flex flex-col h-screen bg-base-200 w-full transition-colors duration-500'>
-            <div className='bg-base-100/40 backdrop-blur-xl border-b border-base-content/10 p-4 pt-20'>
-                <h1 className='text-2xl font-bold text-base-content flex items-center'>
-                    <Clock className='mr-2 size-6 text-primary' /> Call History
-                </h1>
+        <div className='flex flex-col h-full bg-base-100/50 w-full overflow-hidden'>
+            <div className='bg-base-100/60 backdrop-blur-2xl border-b border-base-content/5 p-2 pt-8 shadow-sm'>
+                <div className="max-w-4xl mx-auto flex items-center justify-between">
+                    <h1 className='text-2xl font-extrabold text-base-content tracking-tight flex items-center gap-1.5'>
+                        <div className="p-2 bg-primary/10 rounded-xl">
+                            <Clock className='size-5 text-primary' />
+                        </div>
+                        Call History
+                    </h1>
+                    <div className="text-xs font-semibold text-base-content/40 bg-base-300/50 px-3 py-1.5 rounded-full border border-base-content/5">
+                        {callLogs.length} Calls
+                    </div>
+                </div>
             </div>
 
-            <div className='flex-1 overflow-y-auto p-4 space-y-4'>
+            <div className='flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar'>
                 {loading && (
-                    <div className='flex justify-center items-center h-full'>
+                    <div className='flex flex-col justify-center items-center h-full gap-4'>
                         <span className='loading loading-spinner loading-lg text-primary'></span>
+                        <p className="text-base-content/40 font-medium animate-pulse">Fetching your history...</p>
                     </div>
                 )}
 
                 {!loading && callLogs.length === 0 && (
-                    <div className='text-center text-base-content/50 mt-10'>
-                        <p className="text-lg">No call logs found.</p>
-                        <p className="text-sm">Your call history will appear here.</p>
+                    <div className='flex flex-col items-center justify-center h-full text-center space-y-4 opacity-60'>
+                        <div className="p-8 bg-base-300/30 rounded-full">
+                            <Phone className="size-16 text-base-content/20" />
+                        </div>
+                        <div>
+                            <p className="text-xl font-bold">No call logs found</p>
+                            <p className="text-sm">Your recent voice and video calls will appear here.</p>
+                        </div>
                     </div>
                 )}
 
                 {!loading && callLogs.length > 0 && (
-                    <ul className='space-y-3 max-w-4xl mx-auto'>
+                    <div className='max-w-4xl mx-auto space-y-2 pb-10'>
                         {callLogs.map((log) => {
                             if (!log.caller?._id || !log.callee?._id) return null;
 
@@ -88,30 +102,66 @@ const CallLogsPage = () => {
                             const callDuration = formatDuration(log.duration);
 
                             return (
-                                <li key={log._id} className='glassy p-4 rounded-2xl flex items-center justify-between transition-all hover:scale-[1.01]'>
-                                    <div className='flex items-center gap-4'>
-                                        <div className={`p-3 rounded-full ${wasMissedOrDeclined ? "bg-error/10 text-error" : "bg-success/10 text-success"}`}>
-                                            <Phone size={20} />
-                                        </div>
-                                        <div>
-                                            <p className='font-bold text-base-content'>
-                                                {otherUser?.username || "Unknown User"}
-                                                {otherUser?.tag && <span className="text-xs opacity-40 ml-1">#{otherUser.tag}</span>}
-                                            </p>
-                                            <div className='flex items-center text-xs text-base-content/60 mt-0.5'>
-                                                {isOutgoing ? <ArrowUpRight size={14} className="mr-1 text-primary" /> : <ArrowDownLeft size={14} className="mr-1 text-secondary" />}
-                                                <span>{new Date(log.createdAt).toLocaleString()}</span>
-                                            </div>
+                                <div
+                                    key={log._id}
+                                    className='group flex items-center gap-4 p-4 rounded-3xl hover:bg-base-300/50 transition-all duration-300 border border-transparent hover:border-base-content/5 cursor-default'
+                                >
+                                    {/* Avatar Column */}
+                                    <div className="relative">
+                                        <img
+                                            src={otherUser?.profilePic || "/avatar.png"}
+                                            className="size-14 rounded-2xl object-cover border-2 border-base-300 shadow-md group-hover:scale-105 transition-transform"
+                                            alt="Profile"
+                                        />
+                                        <div className={`absolute -bottom-1 -right-1 p-1.5 rounded-full border-2 border-base-100 shadow-lg ${wasMissedOrDeclined ? "bg-error" : "bg-success"}`}>
+                                            {log.type === 'video' ? <Video size={10} className="text-white" /> : <Phone size={10} className="text-white" />}
                                         </div>
                                     </div>
 
-                                    <div className={`text-sm font-semibold px-3 py-1 rounded-lg ${wasMissedOrDeclined ? "bg-error/10 text-error" : "bg-base-content/5 text-base-content/70"}`}>
-                                        {log.status === 'answered' ? callDuration : log.status}
+                                    {/* Info Column */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between mb-0.5">
+                                            <h3 className="font-bold text-lg text-base-content truncate">
+                                                {otherUser?.username || "Unknown User"}
+                                                <span className="text-xs font-medium text-base-content/30 ml-2">#{otherUser?.tag}</span>
+                                            </h3>
+                                            <span className="text-[11px] font-bold text-base-content/30 uppercase tracking-widest">
+                                                {new Date(log.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex items-center">
+                                                {isOutgoing ? (
+                                                    <ArrowUpRight size={14} className="text-primary" />
+                                                ) : (
+                                                    <ArrowDownLeft size={14} className={wasMissedOrDeclined ? "text-error" : "text-emerald-500"} />
+                                                )}
+                                            </div>
+                                            <p className={`text-sm font-medium ${wasMissedOrDeclined ? "text-error/80" : "text-base-content/50"}`}>
+                                                {wasMissedOrDeclined ? "Missed Call" : isOutgoing ? "Outgoing Call" : "Incoming Call"}
+                                                {log.status === 'answered' && callDuration && (
+                                                    <span className="ml-2 pl-2 border-l border-base-content/10">
+                                                        {callDuration}
+                                                    </span>
+                                                )}
+                                            </p>
+                                        </div>
                                     </div>
-                                </li>
+
+                                    {/* Action Column */}
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            className="btn btn-ghost btn-circle text-primary hover:bg-primary/10"
+                                            onClick={() => {/* Redial logic could go here */ }}
+                                        >
+                                            <Phone size={20} />
+                                        </button>
+                                    </div>
+                                </div>
                             );
                         })}
-                    </ul>
+                    </div>
                 )}
             </div>
         </div>

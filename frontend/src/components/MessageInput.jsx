@@ -80,17 +80,31 @@ const MessageInput = () => {
 				</div>
 			)}
 
-			<form onSubmit={handleSendMessage} className='flex items-center gap-3 glassy p-2 rounded-2xl border border-white/10 shadow-lg'>
+			<form onSubmit={handleSendMessage} className='flex items-center gap-3 bg-slate-900/60 p-2 rounded-2xl border border-slate-700/50 shadow-2xl backdrop-blur-xl'>
 				<div className='flex-1 flex gap-2'>
-					<input type='text' className='w-full bg-base-100/30 border-none focus:ring-2 focus:ring-primary/40 rounded-xl px-4 py-2 text-sm outline-none transition-all placeholder:text-base-content/30' placeholder='Type a message...' value={text} onChange={handleTyping} />
+					<input
+						type='text'
+						className='w-full bg-slate-800/40 border border-slate-700/30 focus:border-primary/50 focus:ring-1 focus:ring-primary/20 rounded-xl px-4 py-2 text-sm outline-none transition-all placeholder:text-slate-600 text-slate-100'
+						placeholder='Type a message...'
+						value={text}
+						onChange={handleTyping}
+					/>
 					<input type='file' accept='image/*' className='hidden' ref={fileInputRef} onChange={handleImageChange} />
 
-					<button type='button' className={`hidden sm:flex btn btn-circle ${imagePreview ? "text-emerald-500" : "text-zinc-400"}`} onClick={() => fileInputRef.current?.click()}>
+					<button
+						type='button'
+						className={`hidden sm:flex btn btn-ghost btn-circle shadow-none hover:bg-slate-700/50 ${imagePreview ? "text-emerald-400" : "text-slate-400"}`}
+						onClick={() => fileInputRef.current?.click()}
+					>
 						<Image size={20} />
 					</button>
 				</div>
-				<button type='submit' className='btn btn-sm btn-circle' disabled={!text.trim() && !imagePreview}>
-					<Send size={22} />
+				<button
+					type='submit'
+					className='btn btn-primary btn-sm btn-circle shadow-lg shadow-primary/20 transition-transform active:scale-90 disabled:bg-slate-800 disabled:text-slate-600'
+					disabled={!text.trim() && !imagePreview}
+				>
+					<Send size={18} />
 				</button>
 			</form>
 		</div>

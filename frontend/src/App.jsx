@@ -147,9 +147,9 @@ function App() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-tr from-base-200 via-base-100 to-primary/5 transition-colors duration-500">
+        <div className="h-screen flex flex-col nebula-mesh selection:bg-primary/30 selection:text-primary-content" data-theme={theme}>
             <Navbar />
-            <main className='pt-16 min-h-[calc(100vh-64px)] flex items-center justify-center'>
+            <main className='flex-1 min-h-0 overflow-hidden'>
                 <Routes>
                     <Route path='/' element={authUser ? <HomePage /> : <Navigate to={"/login"} />} />
                     <Route path='/signup' element={!authUser ? <SignUpPage /> : <Navigate to={"/"} />} />

@@ -22,9 +22,9 @@ const ProfilePage = () => {
   };
 
   return (
-    <div className="h-screen pt-20 w-full"> {/* ADDED w-full */}
-      <div className="w-full p-4 py-8"> {/* CHANGED mx-auto to w-full */}
-        <div className="bg-base-300 rounded-xl p-6 space-y-8">
+    <div className="h-full pt-16 w-full overflow-y-auto">
+      <div className="w-full flex justify-center p-4 py-8">
+        <div className="bg-base-300/40 backdrop-blur-md rounded-3xl p-6 space-y-8 w-full max-w-2xl border border-base-content/5 shadow-2xl">
           <div className="text-center">
             <h1 className="text-2xl font-semibold ">Profile</h1>
             <p className="mt-2">Your profile information</p>

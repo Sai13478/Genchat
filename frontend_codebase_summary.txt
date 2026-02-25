@@ -1,0 +1,840 @@
+// ==========================================
+// FILE: frontend/src/App.jsx
+// ==========================================
+import { useEffect } from "react";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
+
+// Components and Pages
+import Navbar from "./components/Navbar";
+import HomePage from "./pages/HomePage";
+import SignUpPage from "./pages/SignUpPage";
+import LoginPage from "./pages/LoginPage";
+import CallPage from "./pages/CallPage";
+import CallLogsPage from "./pages/CallLogsPage";
+import ProfilePage from "./pages/ProfilePage";
+import SettingsPage from "./pages/SettingsPage";
+import CallFailedPage from "./pages/CallFailedPage";
+import IncomingCallModal from "./components/IncomingCallModal";
+
+// State and Context
+import { useThemeStore } from "./store/useThemeStore";
+import { useAuthStore } from "./store/useAuthStore";
+import { useSocket } from "./context/SocketContext";
+import { useCallStore } from "./store/useCallStore";
+import { useChatStore } from "./store/useChatStore";
+import useListenMessages from "./hooks/useListenMessages";
+
+function App() {
+    const { authUser, isCheckingAuth, checkAuth } = useAuthStore();
+    const { getFriendRequests, subscribeToMessages, unsubscribeFromMessages } = useChatStore();
+    const { socket } = useSocket();
+    const { theme, initializeTheme } = useThemeStore();
+    const navigate = useNavigate();
+
+    // Initialize theme on mount
+    useEffect(() => {
+        initializeTheme();
+    }, [initializeTheme]);
+
+    // Start global message listening for notifications
+    useListenMessages();
+
+    // Destructure all necessary methods from the call store
+    const {
+        setIncomingCallData,
+        handleCallAccepted,
+        handleNewIceCandidate,
+        hangup,
+        handleRenegotiation,
+        handleCallAnsweredElsewhere,
+        handleCallDeclinedElsewhere,
+        setCallId
+    } = useCallStore();
+
+    // Effect for checking authentication status on initial load
+    useEffect(() => {
+        checkAuth();
+    }, [checkAuth]);
+
+    useEffect(() => {
+        if (authUser) {
+            getFriendRequests();
+            subscribeToMessages();
+            return () => unsubscribeFromMessages();
+        }
+    }, [authUser, getFriendRequests, subscribeToMessages, unsubscribeFromMessages]);
+
+    // Effect for handling standard call signaling (incoming, offline, declined)
+    useEffect(() => {
+        if (!socket) return;
+
+        // Synchronize socket with call store for reliable signaling
+        useCallStore.getState().setSocket(socket);
+
+        const handleIncomingCall = (data) => {
+            setIncomingCallData(data);
+        };
+
+        const handleUserOffline = ({ userId }) => {
+            console.log(`Call failed: User ${userId} is offline.`);
+            navigate("/call-failed", { state: { reason: "The user you are trying to call is offline." } });
+        };
+
+        const handleCallDeclined = () => {
+            navigate("/call-failed", { state: { reason: "The user declined your call." } });
+        };
+
+        socket.on("incoming-call", handleIncomingCall);
+        socket.on("call-initiated", ({ callId }) => setCallId(callId));
+        socket.on("user-offline", handleUserOffline);
+        socket.on("call-declined", handleCallDeclined);
+        socket.on("call-answered-elsewhere", handleCallAnsweredElsewhere);
+        socket.on("call-declined-elsewhere", handleCallDeclinedElsewhere);
+
+        return () => {
+            socket.off("incoming-call", handleIncomingCall);
+            socket.off("call-initiated");
+            socket.off("user-offline", handleUserOffline);
+            socket.off("call-declined", handleCallDeclined);
+            socket.off("call-answered-elsewhere", handleCallAnsweredElsewhere);
+            socket.off("call-declined-elsewhere", handleCallDeclinedElsewhere);
+        };
+    }, [socket, navigate, setIncomingCallData, handleCallAnsweredElsewhere, handleCallDeclinedElsewhere]);
+
+    // --- NEW: Effect for handling WebRTC specific signaling ---
+    useEffect(() => {
+        if (!socket) return;
+
+        // Listener for when the callee accepts the call
+        const onCallAccepted = ({ answer, callId }) => {
+            handleCallAccepted(answer, callId);
+        };
+
+        // Listener for re-negotiation (e.g. screen share)
+        const onRenegotiateCall = ({ offer }) => {
+            handleRenegotiation(offer);
+        };
+
+        // Listener for receiving ICE candidates from the other peer
+        const onIceCandidate = ({ candidate }) => {
+            console.log(`Receiving ICE candidate from peer: ${candidate?.type || 'unknown'}`);
+            handleNewIceCandidate(candidate);
+        };
+
+        // Listener for when the other user hangs up
+        const onHangup = () => {
+            hangup(); // This will reset the call state and clean up connections
+        };
+
+        socket.on("call-accepted", onCallAccepted);
+        socket.on("renegotiate-call", onRenegotiateCall);
+        socket.on("ice-candidate", onIceCandidate);
+        socket.on("hangup", onHangup);
+
+        return () => {
+            socket.off("call-accepted", onCallAccepted);
+            socket.off("renegotiate-call", onRenegotiateCall);
+            socket.off("ice-candidate", onIceCandidate);
+            socket.off("hangup", onHangup);
+        };
+    }, [socket, handleCallAccepted, handleNewIceCandidate, hangup, handleRenegotiation]);
+
+    // Loading screen while checking auth
+    if (isCheckingAuth) {
+        return (
+            <div className='h-screen flex justify-center items-center'>
+                <span className='loading loading-lg'></span>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-base-100 transition-colors duration-500 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-tr from-base-200 via-base-100 to-primary/5 opacity-80 pointer-events-none"></div>
+            <Navbar />
+            <main className='pt-16 min-h-screen flex items-center justify-center relative z-10'>
+                <Routes>
+                    <Route path='/' element={authUser ? <HomePage /> : <Navigate to={"/login"} />} />
+                    <Route path='/signup' element={!authUser ? <SignUpPage /> : <Navigate to={"/"} />} />
+                    <Route path='/login' element={!authUser ? <LoginPage /> : <Navigate to={"/"} />} />
+                    <Route path='/call' element={authUser ? <CallPage /> : <Navigate to={"/login"} />} />
+                    <Route path='/call-logs' element={authUser ? <CallLogsPage /> : <Navigate to={"/login"} />} />
+                    <Route path='/profile' element={authUser ? <ProfilePage /> : <Navigate to={"/login"} />} />
+                    <Route path='/settings' element={authUser ? <SettingsPage /> : <Navigate to={"/login"} />} />
+                    <Route path='/call-failed' element={authUser ? <CallFailedPage /> : <Navigate to={"/login"} />} />
+                </Routes>
+                <Toaster />
+                <IncomingCallModal />
+            </main>
+        </div>
+    );
+}
+
+export default App;
+
+// ==========================================
+// FILE: frontend/src/index.css
+// ==========================================
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+    .glassy {
+        background: rgba(255, 255, 255, 0.03);
+        /* Hyper-translucent */
+        backdrop-filter: blur(40px) saturate(200%);
+        -webkit-backdrop-filter: blur(40px) saturate(200%);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        @apply transition-all duration-300;
+    }
+
+    [data-theme='genchat-dark'] .glassy {
+        background: rgba(0, 0, 0, 0.1);
+        /* Deep liquid glass */
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .glass-gradient {
+        background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.15),
+                rgba(255, 255, 255, 0.05));
+        backdrop-filter: blur(25px);
+        -webkit-backdrop-filter: blur(25px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        @apply transition-all duration-500;
+    }
+}
+
+/* Smooth transitions for theme feel */
+* {
+    @apply transition-colors duration-300;
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+    font-family: 'SF Pro Display', 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    @apply bg-base-200 text-base-content antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Premium Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    @apply bg-primary/20 rounded-full hover:bg-primary/40 transition-all;
+}
+
+::selection {
+    @apply bg-primary/20 text-primary;
+}
+
+// ==========================================
+// FILE: frontend/src/components/ChatContainer.jsx
+// ==========================================
+import { useChatStore } from "../store/useChatStore";
+import { useEffect, useRef } from "react";
+import ChatHeader from "./ChatHeader";
+import MessageInput from "./MessageInput";
+import MessageSkeleton from "./skeletons/MessageSkeleton";
+import { useAuthStore } from "../store/useAuthStore";
+import { formatMessageTime } from "../lib/utils";
+import useListenMessages from "../hooks/useListenMessages";
+import useListenTyping from "../hooks/useListenTyping";
+import { useSocket } from "../context/SocketContext";
+import { Check, CheckCheck } from "lucide-react";
+
+const ChatContainer = () => {
+  const { messages, getMessages, isMessagesLoading, selectedUser } = useChatStore();
+  const { authUser } = useAuthStore();
+  const { socket } = useSocket();
+  const messageEndRef = useRef(null);
+
+  // This custom hook now handles all real-time message listening.
+  // useListenMessages is now called globally in App.jsx to handle notifications
+  useListenTyping();
+
+  useEffect(() => {
+    // When the selected user changes:
+    if (selectedUser?._id) {
+      // 1. Fetch the message history.
+      getMessages(selectedUser._id);
+
+      // 2. Mark all messages from this user as seen.
+      socket?.emit("markMessagesAsSeen", { conversationId: selectedUser.conversationId, userIdOfSender: selectedUser._id });
+    }
+  }, [selectedUser?._id, getMessages, socket]);
+
+  useEffect(() => {
+    // Scroll to the bottom whenever the messages array changes.
+    if (messageEndRef.current && messages) {
+      messageEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  if (isMessagesLoading) {
+    return (
+      <div className='flex-1 flex flex-col overflow-hidden'>
+        <ChatHeader />
+        <MessageSkeleton />
+        <MessageInput />
+      </div>
+    );
+  }
+
+  return (
+    <div className='flex-1 flex flex-col overflow-hidden'>
+      <ChatHeader />
+
+      <div className='flex-1 overflow-y-auto p-4 space-y-4'>
+        {Array.isArray(messages) &&
+          messages.map((message) => (
+            <div
+              key={message._id}
+              className={`chat ${message.senderId === authUser._id ? "chat-end" : "chat-start"}`}
+            >
+              <div className=' chat-image avatar'>
+                <div className='size-10 rounded-full border'>
+                  <img
+                    src={
+                      message.senderId === authUser._id
+                        ? authUser.profilePic || "/avatar.png"
+                        : selectedUser.profilePic || "/avatar.png"
+                    }
+                    alt={message.senderId === authUser._id ? authUser.username : selectedUser.username}
+                  />
+                </div>
+              </div>
+              <div className='chat-header mb-1'>
+                <time className='text-xs opacity-50 ml-1'>{formatMessageTime(message.createdAt)}</time>
+              </div>
+              <div className={`chat-bubble flex flex-col shadow-lg transition-all duration-300 ${message.senderId === authUser._id ? "bg-primary text-primary-content" : "bg-white/15 backdrop-blur-3xl text-base-content border border-white/10"}`}>
+                {message.image && (
+                   <img src={message.image} alt='Attachment' className='sm:max-w-[200px] rounded-xl mb-2' />
+                )}
+                {message.text && <p className="leading-relaxed">{message.text}</p>}
+              </div>
+              {message.senderId === authUser._id && (
+                <div className='chat-footer opacity-50 flex gap-1 items-center'>
+                  {message.seen ? (
+                    <CheckCheck className='size-4 text-blue-500' />
+                  ) : message.delivered ? (
+                    <CheckCheck className='size-4 text-zinc-400' />
+                  ) : (
+                    <Check className='size-4 text-zinc-400' />
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        {/* Empty div used as a stable anchor for auto-scrolling */}
+        <div ref={messageEndRef} />
+      </div>
+
+      <MessageInput />
+    </div>
+  );
+};
+export default ChatContainer;
+
+// ==========================================
+// FILE: frontend/src/components/ChatHeader.jsx
+// ==========================================
+import { ArrowLeft, Phone, Video } from "lucide-react";
+import { useChatStore } from "../store/useChatStore";
+import { useSocket } from "../context/SocketContext";
+import { useCallStore } from "../store/useCallStore";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+
+const ChatHeader = () => {
+    const { selectedUser, isTyping, setSelectedUser } = useChatStore();
+    const { onlineUsers } = useSocket();
+    const { initiateCall, setLocalStream } = useCallStore();
+    const { socket } = useSocket();
+    const navigate = useNavigate();
+
+    if (!selectedUser) {
+        return null;
+    }
+
+    const isOnline = onlineUsers.includes(selectedUser._id);
+
+    const handleCall = async (callType) => {
+        try {
+            const videoConstraints = callType === "video" ? {
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+            } : false;
+
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: videoConstraints,
+                audio: true,
+            });
+            setLocalStream(stream);
+
+            initiateCall(selectedUser, callType, stream);
+            navigate("/call");
+        } catch (error) {
+            toast.error("Could not start call. Please allow camera and microphone access.");
+            console.error("Error getting media stream:", error);
+        }
+    };
+
+    return (
+        <div className='flex items-center justify-between p-4 border-b border-white/5 bg-transparent rounded-t-3xl'>
+            <div className='flex items-center gap-3'>
+                {/* Back button - visible only on mobile */}
+                <button
+                    className='md:hidden btn btn-ghost btn-sm btn-circle'
+                    onClick={() => setSelectedUser(null)}
+                >
+                    <ArrowLeft className='size-5' />
+                </button>
+                <div className={`avatar ${isOnline ? "online" : "offline"}`}>
+                    <div className='w-12 rounded-full border border-white/10'>
+                        <img src={selectedUser.profilePic || "/avatar.png"} alt='user avatar' />
+                    </div>
+                </div>
+                <div className='flex flex-col'>
+                    <p className='font-bold text-base-content'>
+                        {selectedUser.username}
+                        <span className="text-[10px] opacity-40 ml-1">#{selectedUser.tag}</span>
+                    </p>
+                    <span className='text-[10px] text-base-content/50 font-medium tracking-wide uppercase'>{isTyping ? "typing..." : isOnline ? "Online" : "Offline"}</span>
+                </div>
+            </div>
+            <div className='flex gap-4'>
+                <div className="flex items-center gap-2 bg-white/5 p-2 rounded-2xl border border-white/10">
+                    <Phone className='size-5 cursor-pointer hover:text-primary transition-colors' onClick={() => handleCall("audio")} />
+                    <div className="w-px h-4 bg-white/10 mx-1"></div>
+                    <Video className='size-5 cursor-pointer hover:text-primary transition-colors' onClick={() => handleCall("video")} />
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default ChatHeader;
+
+// ==========================================
+// FILE: frontend/src/components/Conversation.jsx
+// ==========================================
+import { useChatStore } from "../store/useChatStore";
+
+const Conversation = ({ conversation, isOnline }) => {
+	const { selectedUser, setSelectedUser } = useChatStore();
+	const isSelected = selectedUser?._id === conversation._id;
+
+	return (
+		<>
+			<div
+				className={`flex gap-3 items-center hover:bg-primary/10 rounded-xl p-2 cursor-pointer transition-all duration-300 group
+				${isSelected ? "bg-primary/20 shadow-sm" : ""}
+			`}
+				onClick={() => setSelectedUser(conversation)}
+			>
+				<div className={`avatar ${isOnline ? "online" : ""}`}>
+					<div className='w-12 rounded-full'>
+						<img src={conversation.profilePic || "/avatar.png"} alt='user avatar' />
+					</div>
+				</div>
+
+				<div className='flex flex-col flex-1 min-w-0'>
+					<p className={`font-bold transition-all duration-300 ${isSelected ? "text-primary scale-105 origin-left" : "text-base-content/80 group-hover:text-base-content"}`}>
+						{conversation.username}
+						<span className='text-[10px] opacity-40 ml-1 font-medium'>#{conversation.tag}</span>
+					</p>
+				</div>
+			</div>
+			<div className='border-b border-white/5 mx-4' />
+		</>
+	);
+};
+export default Conversation;
+
+// ==========================================
+// FILE: frontend/src/components/MessageInput.jsx
+// ==========================================
+import { useRef, useState } from "react";
+import { useChatStore } from "../store/useChatStore";
+import { Image, Send, X } from "lucide-react";
+import toast from "react-hot-toast";
+import { useSocket } from "../context/SocketContext";
+
+const MessageInput = () => {
+	const [text, setText] = useState("");
+	const [imagePreview, setImagePreview] = useState(null);
+	const fileInputRef = useRef(null);
+	const { sendMessage, selectedUser } = useChatStore();
+	const { socket } = useSocket();
+	const typingTimeoutRef = useRef(null);
+
+	const handleImageChange = (e) => {
+		const file = e.target.files[0];
+		if (!file.type.startsWith("image/")) {
+			toast.error("Please select an image file");
+			return;
+		}
+
+		const reader = new FileReader();
+		reader.onloadend = () => {
+			setImagePreview(reader.result);
+		};
+		reader.readAsDataURL(file);
+	};
+
+	const removeImage = () => {
+		setImagePreview(null);
+		if (fileInputRef.current) fileInputRef.current.value = "";
+	};
+
+	const handleSendMessage = async (e) => {
+		e.preventDefault();
+		if (!text.trim() && !imagePreview) return;
+
+		try {
+			// Stop typing event when message is sent
+			if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+			socket?.emit("stop-typing", { to: selectedUser._id });
+
+			await sendMessage({
+				text: text.trim(),
+				image: imagePreview,
+			});
+
+			// Clear form
+			setText("");
+			setImagePreview(null);
+			if (fileInputRef.current) fileInputRef.current.value = "";
+		} catch (error) {
+			console.error("Failed to send message:", error);
+		}
+	};
+
+	const handleTyping = (e) => {
+		setText(e.target.value);
+		socket?.emit("typing", { to: selectedUser._id });
+
+		if (typingTimeoutRef.current) {
+			clearTimeout(typingTimeoutRef.current);
+		}
+
+		typingTimeoutRef.current = setTimeout(() => {
+			socket?.emit("stop-typing", { to: selectedUser._id });
+		}, 2000); // 2 seconds of inactivity
+	};
+
+	return (
+		<div className='p-4 w-full'>
+			{imagePreview && (
+				<div className='mb-3 flex items-center gap-2'>
+					<div className='relative'>
+						<img src={imagePreview} alt='Preview' className='w-20 h-20 object-cover rounded-lg border border-zinc-700' />
+						<button onClick={removeImage} className='absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-base-300 flex items-center justify-center' type='button'>
+							<X className='size-3' />
+						</button>
+					</div>
+				</div>
+			)}
+
+			<form onSubmit={handleSendMessage} className='flex items-center gap-3 bg-white/5 p-2 rounded-2xl border border-white/10 shadow-lg backdrop-blur-none'>
+				<div className='flex-1 flex gap-2'>
+					<input type='text' className='w-full bg-base-100/30 border-none focus:ring-2 focus:ring-primary/40 rounded-xl px-4 py-2 text-sm outline-none transition-all placeholder:text-base-content/30' placeholder='Type a message...' value={text} onChange={handleTyping} />
+					<input type='file' accept='image/*' className='hidden' ref={fileInputRef} onChange={handleImageChange} />
+
+					<button type='button' className={`hidden sm:flex btn btn-circle ${imagePreview ? "text-emerald-500" : "text-zinc-400"}`} onClick={() => fileInputRef.current?.click()}>
+						<Image size={20} />
+					</button>
+				</div>
+				<button type='submit' className='btn btn-sm btn-circle' disabled={!text.trim() && !imagePreview}>
+					<Send size={22} />
+				</button>
+			</form>
+		</div>
+	);
+};
+export default MessageInput;
+
+// ==========================================
+// FILE: frontend/src/components/Navbar.jsx
+// ==========================================
+import { Link } from "react-router-dom";
+import { useAuthStore } from "../store/useAuthStore";
+import { LogOut, MessageSquare, Settings, User, PhoneCall } from "lucide-react";
+
+const Navbar = () => {
+  const { logout, authUser } = useAuthStore();
+
+  return (
+    <header
+      className="bg-transparent backdrop-blur-md border-b border-white/5 fixed w-full top-0 z-40 transition-all duration-500"
+    >
+      <div className="container mx-auto px-4 h-16">
+        <div className="flex items-center justify-between h-full">
+          <div className="flex items-center gap-8">
+            <Link to="/" className="flex items-center gap-2.5 hover:opacity-80 transition-all">
+              <div className="size-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                <MessageSquare className="w-5 h-5 text-primary" />
+              </div>
+              <h1 className="text-xl font-bold tracking-tight">
+                <span className="text-primary italic">Gen</span>
+                <span className="text-base-content">Chat</span>
+              </h1>
+            </Link>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Link
+              to={"/settings"}
+              className={`
+              btn btn-sm gap-2 transition-colors
+              
+              `}
+            >
+              <Settings className="w-4 h-4" />
+              <span className="hidden sm:inline">Settings</span>
+            </Link>
+
+            {authUser && (
+              <>
+                <Link to={"/call-logs"} className={`btn btn-sm gap-2`}>
+                  <PhoneCall className='size-4' />
+                  <span className='hidden sm:inline'>Call Logs</span>
+                </Link>
+
+                <Link to={"/profile"} className={`btn btn-sm gap-2`}>
+                  <User className="size-5" />
+                  <span className="hidden sm:inline">Profile</span>
+                </Link>
+
+                <button className="flex gap-2 items-center" onClick={logout}>
+                  <LogOut className="size-5" />
+                  <span className="hidden sm:inline">Logout</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+};
+export default Navbar;
+
+// ==========================================
+// FILE: frontend/src/components/Sidebar.jsx
+// ==========================================
+import { useEffect, useState } from "react";
+import { LogOut, Search } from "lucide-react";
+import { useAuthStore } from "../store/useAuthStore";
+import { useSocket } from "../context/SocketContext";
+import { useChatStore } from "../store/useChatStore";
+import Conversation from "./Conversation";
+import toast from "react-hot-toast";
+
+const Sidebar = () => {
+    const { authUser } = useAuthStore();
+    const { onlineUsers } = useSocket();
+    const { users, getUsers, isUsersLoading, searchUser, sendFriendRequest, friendRequests, acceptFriendRequest, rejectFriendRequest } = useChatStore();
+    const [usernameQuery, setUsernameQuery] = useState("");
+    const [tagQuery, setTagQuery] = useState("");
+    const [searchResult, setSearchResult] = useState(null);
+    const [isSearching, setIsSearching] = useState(false);
+
+    useEffect(() => {
+        getUsers();
+    }, [getUsers]);
+
+    const handleSearch = async (e) => {
+        e.preventDefault();
+        if (!usernameQuery.trim() || !tagQuery.trim()) {
+            toast.error("Both username and tag are required");
+            return;
+        }
+
+        if (tagQuery.length !== 4 || isNaN(tagQuery)) {
+            toast.error("Tag must be a 4-digit number");
+            return;
+        }
+
+        setIsSearching(true);
+        const result = await searchUser(`${usernameQuery}#${tagQuery}`);
+        setSearchResult(result);
+        setIsSearching(false);
+    };
+
+    const handleSendRequest = async () => {
+        if (searchResult) {
+            await sendFriendRequest(searchResult._id);
+            setSearchResult(null);
+            setUsernameQuery("");
+            setTagQuery("");
+        }
+    };
+
+    return (
+        <div className='flex flex-col w-full h-full p-6 overflow-hidden'>
+            <div className='flex items-center justify-between mb-8'>
+                <div className='flex items-center gap-3'>
+                    <div className="relative group">
+                        <img src={authUser.profilePic || "/avatar.png"} alt='User avatar' className='size-12 rounded-full border-2 border-primary/20 object-cover shadow-lg transition-all group-hover:border-primary/40' />
+                        <div className="absolute bottom-0 right-0 size-3 bg-success rounded-full border-2 border-base-100"></div>
+                    </div>
+                    <div className="flex flex-col">
+                        <p className="font-bold text-base-content text-lg leading-tight tracking-tight">{authUser.username}</p>
+                        <p className="text-xs text-base-content/50 font-medium">#{authUser.tag}</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Search bar */}
+            <form onSubmit={handleSearch} className='mb-6'>
+                <div className="flex items-center gap-2 p-1.5 bg-white/10 backdrop-blur-md rounded-xl border border-white/5 focus-within:border-primary/30 transition-all">
+                    <div className="relative flex-1">
+                        <Search className='absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-base-content/30' />
+                        <input
+                            type='text'
+                            placeholder='Search user'
+                            value={usernameQuery}
+                            onChange={(e) => setUsernameQuery(e.target.value)}
+                            className='w-full bg-transparent text-sm pl-8 pr-2 py-1 outline-none text-base-content placeholder:text-base-content/20'
+                        />
+                    </div>
+                    <div className="h-4 w-px bg-white/10"></div>
+                    <input
+                        type='text'
+                        placeholder='Tag'
+                        maxLength={4}
+                        value={tagQuery}
+                        onChange={(e) => setTagQuery(e.target.value.replace(/\D/g, ""))}
+                        className='w-12 bg-transparent text-xs text-center outline-none text-base-content/60 placeholder:text-base-content/20'
+                    />
+                    <button type="submit" className="flex items-center justify-center size-7 rounded-lg bg-primary text-primary-content hover:bg-primary/90 transition-all shadow-md">
+                        {isSearching ? <span className="loading loading-spinner size-3"></span> : <Search className="size-3.5" />}
+                    </button>
+                </div>
+            </form>
+
+            {/* Search Result */}
+            {searchResult && (
+                <div className="glassy p-3 rounded-2xl mb-4 animate-in fade-in slide-in-from-top-2 border border-white/10 shadow-sm">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <img src={searchResult.profilePic || "/avatar.png"} alt="avatar" className="size-8 rounded-full border" />
+                            <div className="text-sm">
+                                <p className="font-bold text-base-content">{searchResult.username}#<span className="opacity-50">{searchResult.tag}</span></p>
+                            </div>
+                        </div>
+                        <button onClick={handleSendRequest} className="btn btn-xs btn-primary">Send Request</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Friend Requests */}
+            {friendRequests.length > 0 && (
+                <div className="mb-4">
+                    <p className="text-xs font-semibold opacity-50 mb-2 px-1 uppercase tracking-wider">Friend Requests ({friendRequests.length})</p>
+                    <div className="space-y-2 max-h-40 overflow-auto pr-1">
+                        {friendRequests.map((req) => (
+                            <div key={req._id} className="glassy p-2 rounded-xl flex items-center justify-between border border-white/10">
+                                <div className="flex items-center gap-2">
+                                    <img src={req.from.profilePic || "/avatar.png"} alt="avatar" className="size-6 rounded-full border" />
+                                    <p className="text-xs font-medium text-base-content truncate max-w-[80px]">{req.from.username}</p>
+                                </div>
+                                <div className="flex gap-1">
+                                    <button onClick={() => acceptFriendRequest(req.from._id)} className="btn btn-[10px] h-6 min-h-6 btn-success px-2">Accept</button>
+                                    <button onClick={() => rejectFriendRequest(req.from._id)} className="btn btn-[10px] h-6 min-h-6 btn-ghost px-2 bg-base-300">Reject</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div className='divider px-3 my-0' />
+
+            <div className='flex-1 overflow-auto mt-2'>
+                {isUsersLoading && (
+                    <div className="flex justify-center p-4">
+                        <span className="loading loading-spinner loading-sm"></span>
+                    </div>
+                )}
+                {!isUsersLoading && users.length === 0 && (
+                    <p className='text-center text-gray-400 text-sm mt-4'>No friends yet. Add some!</p>
+                )}
+                {!isUsersLoading &&
+                    users.map((conversation) => (
+                        <Conversation
+                            key={conversation._id}
+                            conversation={conversation}
+                            isOnline={onlineUsers?.includes(conversation._id)}
+                        />
+                    ))}
+            </div>
+        </div>
+    );
+};
+
+export default Sidebar;
+
+// ==========================================
+// FILE: frontend/src/pages/HomePage.jsx
+// ==========================================
+import { useChatStore } from "../store/useChatStore";
+
+import Sidebar from "../components/Sidebar";
+import NoChatSelected from "../components/NoChatSelected";
+import ChatContainer from "../components/ChatContainer";
+
+const HomePage = () => {
+  const { selectedUser } = useChatStore();
+
+  return (
+    <div className="min-h-[calc(100vh-64px)] w-full overflow-hidden transition-all duration-700 relative">
+      {/* Immersive Blended Background Layer */}
+      <div className="absolute inset-0 bg-gradient-to-br from-base-100 via-base-200 to-primary/5 opacity-50"></div>
+
+      {/* Muted Liquid Elements - Soft and Immense */}
+      <div className="absolute -top-[10%] -left-[10%] w-[90%] h-[90%] bg-primary/5 rounded-full blur-[140px] animate-pulse pointer-events-none origin-center"></div>
+      <div className="absolute -bottom-[10%] -right-[10%] w-[90%] h-[90%] bg-indigo-500/5 rounded-full blur-[140px] animate-pulse pointer-events-none origin-center" style={{ animationDelay: '3s' }}></div>
+      <div className="absolute top-[20%] left-[10%] w-[70%] h-[70%] bg-purple-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+
+      {/* Subtle overlay to mute vibrancy further */}
+      <div className="absolute inset-0 bg-base-100/40 pointer-events-none"></div>
+
+      <div className="flex items-center justify-center p-4 md:p-6 pt-20 h-full relative z-10">
+        <div className="glassy rounded-3xl w-full h-full max-w-7xl max-h-[850px] overflow-hidden shadow-2xl border border-white/10 flex flex-col md:flex-row">
+          {/* Mobile: show sidebar when no user selected, hide when chatting */}
+          {/* Desktop: always show sidebar */}
+          <div className={`${selectedUser ? "hidden md:flex" : "flex"} w-full md:w-1/3 md:max-w-sm border-r border-white/5`}>
+            <Sidebar />
+          </div>
+
+          {/* Mobile: show chat when user selected, hide when no user */}
+          {/* Desktop: always show chat area */}
+          <div className={`${selectedUser ? "flex" : "hidden md:flex"} flex-1 overflow-hidden bg-transparent`}>
+            {!selectedUser ? <NoChatSelected /> : <ChatContainer />}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+export default HomePage;

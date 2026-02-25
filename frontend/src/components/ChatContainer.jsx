@@ -74,20 +74,24 @@ const ChatContainer = () => {
               <div className='chat-header mb-1'>
                 <time className='text-xs opacity-50 ml-1'>{formatMessageTime(message.createdAt)}</time>
               </div>
-              <div className={`chat-bubble flex flex-col shadow-sm transition-all duration-300 ${message.senderId === authUser._id ? "bg-primary text-primary-content" : "glassy text-base-content border border-white/10"}`}>
+              <div
+                className={`chat-bubble flex flex-col shadow-lg border-none ${message.senderId === authUser._id
+                  ? "bg-gradient-to-br from-primary to-indigo-600 text-white font-medium"
+                  : "bg-slate-800/80 text-slate-100 border border-slate-700/50 backdrop-blur-sm"}`}
+              >
                 {message.image && (
                   <img src={message.image} alt='Attachment' className='sm:max-w-[200px] rounded-xl mb-2' />
                 )}
-                {message.text && <p className="leading-relaxed">{message.text}</p>}
+                {message.text && <p>{message.text}</p>}
               </div>
               {message.senderId === authUser._id && (
-                <div className='chat-footer opacity-50 flex gap-1 items-center'>
+                <div className='chat-footer opacity-80 flex gap-1 items-center mt-1'>
                   {message.seen ? (
-                    <CheckCheck className='size-4 text-blue-500' />
+                    <CheckCheck className='size-4 text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.3)]' />
                   ) : message.delivered ? (
-                    <CheckCheck className='size-4 text-zinc-400' />
+                    <CheckCheck className='size-4 text-slate-500' />
                   ) : (
-                    <Check className='size-4 text-zinc-400' />
+                    <Check className='size-4 text-slate-500' />
                   )}
                 </div>
               )}
@@ -101,4 +105,5 @@ const ChatContainer = () => {
     </div>
   );
 };
+
 export default ChatContainer;

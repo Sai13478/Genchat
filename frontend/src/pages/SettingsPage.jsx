@@ -19,13 +19,13 @@ const SettingsPage = () => {
           <p className="text-sm text-base-content/60">Manage your interface appearance and account security.</p>
         </div>
 
-        <div className="glassy p-6 rounded-3xl flex items-center justify-between gap-4">
+        <div className="bg-base-300 rounded-3xl p-6 flex items-center justify-between gap-4 border border-base-content/5 shadow-xl">
           <div className="flex items-center gap-4">
-            <div className={`p-3 rounded-2xl ${theme === "genchat-dark" ? "bg-primary/20 text-primary" : "bg-orange-100 text-orange-600"}`}>
+            <div className={`p-3 rounded-2xl ${theme === "genchat-dark" ? "bg-primary/20 text-primary" : "bg-primary/10 text-primary"}`}>
               {theme === "genchat-dark" ? <Moon size={24} /> : <Sun size={24} />}
             </div>
             <div>
-              <h3 className="font-bold text-lg">Dark Mode</h3>
+              <h3 className="font-bold text-lg text-base-content">Dark Mode</h3>
               <p className="text-sm text-base-content/60">Switch between light and dark premium aesthetics</p>
             </div>
           </div>

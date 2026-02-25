@@ -46,13 +46,13 @@ export default {
       },
       {
         "genchat-dark": {
-          "primary": "#3b82f6",
-          "secondary": "#0ea5e9",
-          "accent": "#60a5fa",
+          "primary": "#4f46e5", // Muted Professional Indigo
+          "secondary": "#334155", // Slate 700
+          "accent": "#475569", // Slate 600
           "neutral": "#f8fafc",
           "base-100": "#020617",
-          "base-200": "#0f172a",
-          "base-300": "#1e293b",
+          "base-200": "#070c1b", // Deeper navy
+          "base-300": "#111827", // Darker slate
           "base-content": "#f8fafc",
           "--rounded-box": "1.5rem",
           "--rounded-btn": "1rem",

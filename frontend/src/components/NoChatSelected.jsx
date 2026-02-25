@@ -47,9 +47,11 @@ const NoChatSelected = () => {
         </div>
 
         {/* Welcome Text */}
-        <div className="space-y-2">
-          <h2 className="text-3xl font-bold tracking-tight text-base-content">Welcome to Genchat</h2>
-          <p className="text-base-content/50 text-base max-w-sm mx-auto">
+        <div className="space-y-4">
+          <h2 className="text-4xl font-extrabold tracking-tighter text-slate-100">
+            Welcome to <span className="bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent italic">Gen</span>Chat
+          </h2>
+          <p className="text-slate-500 text-lg max-w-sm mx-auto leading-relaxed">
             Please choose a conversation from the sidebar to begin chatting.
           </p>
         </div>
