@@ -4,7 +4,32 @@
 
 @layer utilities {
     .glassy {
-        @apply bg-base-100/30 backdrop-blur-2xl border border-base-content/10 shadow-glass ring-2 ring-white/5;
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.2),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        @apply transition-all duration-300;
+    }
+
+    [data-theme='genchat-dark'] .glassy {
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .glass-gradient {
+        background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.15),
+                rgba(255, 255, 255, 0.05));
+        backdrop-filter: blur(25px);
+        -webkit-backdrop-filter: blur(25px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        @apply transition-all duration-500;
     }
 }
 
