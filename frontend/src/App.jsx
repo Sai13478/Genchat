@@ -1,9 +1,10 @@
 import { useEffect } from "react";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 
 // Components and Pages
 import Navbar from "./components/Navbar";
+import Sidebar from "./components/Sidebar";
 import HomePage from "./pages/HomePage";
 import SignUpPage from "./pages/SignUpPage";
 import LoginPage from "./pages/LoginPage";
@@ -24,10 +25,11 @@ import useListenMessages from "./hooks/useListenMessages";
 
 function App() {
     const { authUser, isCheckingAuth, checkAuth } = useAuthStore();
-    const { getFriendRequests, subscribeToMessages, unsubscribeFromMessages } = useChatStore();
+    const { getFriendRequests, subscribeToMessages, unsubscribeFromMessages, selectedUser } = useChatStore();
     const { socket } = useSocket();
     const { theme, initializeTheme } = useThemeStore();
     const navigate = useNavigate();
+    const location = useLocation();
 
     // Initialize theme on mount
     useEffect(() => {
@@ -147,22 +149,42 @@ function App() {
     }
 
     return (
-        <div className="h-screen flex flex-col nebula-mesh selection:bg-primary/30 selection:text-primary-content" data-theme={theme}>
-            <Navbar />
-            <main className='flex-1 min-h-0 overflow-hidden'>
-                <Routes>
-                    <Route path='/' element={authUser ? <HomePage /> : <Navigate to={"/login"} />} />
-                    <Route path='/signup' element={!authUser ? <SignUpPage /> : <Navigate to={"/"} />} />
-                    <Route path='/login' element={!authUser ? <LoginPage /> : <Navigate to={"/"} />} />
-                    <Route path='/call' element={authUser ? <CallPage /> : <Navigate to={"/login"} />} />
-                    <Route path='/call-logs' element={authUser ? <CallLogsPage /> : <Navigate to={"/login"} />} />
-                    <Route path='/profile' element={authUser ? <ProfilePage /> : <Navigate to={"/login"} />} />
-                    <Route path='/settings' element={authUser ? <SettingsPage /> : <Navigate to={"/login"} />} />
-                    <Route path='/call-failed' element={authUser ? <CallFailedPage /> : <Navigate to={"/login"} />} />
-                </Routes>
-                <Toaster />
-                <IncomingCallModal />
-            </main>
+        <div className="h-screen w-full flex flex-col nebula-mesh selection:bg-primary/30 selection:text-primary-content overflow-hidden" data-theme={theme}>
+            {!authUser ? (
+                <>
+                    <Navbar />
+                    <div className='flex-1 flex flex-col min-h-0 overflow-hidden'>
+                        <Routes>
+                            <Route path='/signup' element={<SignUpPage />} />
+                            <Route path='/login' element={<LoginPage />} />
+                            <Route path='*' element={<Navigate to="/login" />} />
+                        </Routes>
+                        <Toaster />
+                    </div>
+                </>
+            ) : (
+                <div className='flex h-screen w-full overflow-hidden bg-slate-900/60 backdrop-blur-2xl'>
+                    {/* Sidebar Column - Only visible on desktop OR on mobile if not in a subview/chat */}
+                    <div className={`w-full md:w-[350px] lg:w-[400px] border-r border-slate-800/50 bg-slate-900/40 ${selectedUser || location.pathname !== '/' ? "hidden md:flex" : "flex"}`}>
+                        <Sidebar />
+                    </div>
+
+                    {/* Content Column - Main action area */}
+                    <div className={`flex-1 flex flex-col min-h-0 overflow-hidden relative ${selectedUser || location.pathname !== '/' ? "flex" : "hidden md:flex"}`}>
+                        <Routes>
+                            <Route path='/' element={<HomePage />} />
+                            <Route path='/call' element={<CallPage />} />
+                            <Route path='/call-logs' element={<CallLogsPage />} />
+                            <Route path='/profile' element={<ProfilePage />} />
+                            <Route path='/settings' element={<SettingsPage />} />
+                            <Route path='/call-failed' element={<CallFailedPage />} />
+                            <Route path='*' element={<Navigate to="/" />} />
+                        </Routes>
+                        <Toaster />
+                        <IncomingCallModal />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -22,13 +22,14 @@ const ProfilePage = () => {
   };
 
   return (
-    <div className="h-full pt-16 w-full overflow-y-auto">
-      <div className="w-full flex justify-center p-4 py-8">
-        <div className="bg-base-300/40 backdrop-blur-md rounded-3xl p-6 space-y-8 w-full max-w-2xl border border-base-content/5 shadow-2xl">
-          <div className="text-center">
-            <h1 className="text-2xl font-semibold ">Profile</h1>
-            <p className="mt-2">Your profile information</p>
-          </div>
+    <div className="h-full w-full overflow-y-auto bg-slate-900/40">
+      <div className='px-4 py-3 border-b border-white/5 bg-slate-800/20 backdrop-blur-md sticky top-0 z-10'>
+        <h1 className="text-xl font-bold text-slate-100">Profile</h1>
+        <p className="text-[10px] text-slate-500 font-medium tracking-wide uppercase">Manage your personal information</p>
+      </div>
+
+      <div className="w-full flex justify-center p-4 py-12">
+        <div className="bg-slate-800/40 backdrop-blur-md rounded-3xl p-8 space-y-8 w-full max-w-2xl border border-white/5 shadow-2xl">
 
           {/* avatar upload section */}
 

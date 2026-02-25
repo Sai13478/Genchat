@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useChatStore } from "../store/useChatStore";
-import { Image, Send, X } from "lucide-react";
+import { Paperclip, Send, X, Smile } from "lucide-react";
 import toast from "react-hot-toast";
 import { useSocket } from "../context/SocketContext";
 
@@ -68,43 +68,52 @@ const MessageInput = () => {
 	};
 
 	return (
-		<div className='p-4 w-full'>
+		<div className='p-3 w-full bg-slate-900/40 border-t border-slate-800/50'>
 			{imagePreview && (
-				<div className='mb-3 flex items-center gap-2'>
+				<div className='mb-3 flex items-center gap-2 px-2'>
 					<div className='relative'>
-						<img src={imagePreview} alt='Preview' className='w-20 h-20 object-cover rounded-lg border border-zinc-700' />
-						<button onClick={removeImage} className='absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-base-300 flex items-center justify-center' type='button'>
-							<X className='size-3' />
+						<img src={imagePreview} alt='Preview' className='w-16 h-16 object-cover rounded-xl border border-primary/20 shadow-lg' />
+						<button onClick={removeImage} className='absolute -top-2 -right-2 w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 hover:text-white transition-colors' type='button'>
+							<X className='size-3.5' />
 						</button>
 					</div>
 				</div>
 			)}
 
-			<form onSubmit={handleSendMessage} className='flex items-center gap-3 bg-slate-900/60 p-2 rounded-2xl border border-slate-700/50 shadow-2xl backdrop-blur-xl'>
-				<div className='flex-1 flex gap-2'>
+			<form onSubmit={handleSendMessage} className='flex items-center gap-2'>
+				<div className="flex items-center gap-1">
+					<button
+						type='button'
+						className="p-2 text-slate-400 hover:text-primary transition-all rounded-full hover:bg-slate-700/30"
+					>
+						<Smile size={22} />
+					</button>
+					<button
+						type='button'
+						className={`p-2 transition-all rounded-full hover:bg-slate-700/30 ${imagePreview ? "text-emerald-400" : "text-slate-400 hover:text-primary"}`}
+						onClick={() => fileInputRef.current?.click()}
+					>
+						<Paperclip size={22} className={imagePreview ? "rotate-45" : ""} />
+					</button>
+					<input type='file' accept='image/*' className='hidden' ref={fileInputRef} onChange={handleImageChange} />
+				</div>
+
+				<div className='flex-1 relative'>
 					<input
 						type='text'
-						className='w-full bg-slate-800/40 border border-slate-700/30 focus:border-primary/50 focus:ring-1 focus:ring-primary/20 rounded-xl px-4 py-2 text-sm outline-none transition-all placeholder:text-slate-600 text-slate-100'
-						placeholder='Type a message...'
+						className='w-full bg-slate-800/50 border border-slate-700/30 focus:border-primary/50 rounded-full px-5 py-2.5 text-sm outline-none transition-all placeholder:text-slate-500 text-slate-100 shadow-inner'
+						placeholder='Type a message'
 						value={text}
 						onChange={handleTyping}
 					/>
-					<input type='file' accept='image/*' className='hidden' ref={fileInputRef} onChange={handleImageChange} />
-
-					<button
-						type='button'
-						className={`hidden sm:flex btn btn-ghost btn-circle shadow-none hover:bg-slate-700/50 ${imagePreview ? "text-emerald-400" : "text-slate-400"}`}
-						onClick={() => fileInputRef.current?.click()}
-					>
-						<Image size={20} />
-					</button>
 				</div>
+
 				<button
 					type='submit'
-					className='btn btn-primary btn-sm btn-circle shadow-lg shadow-primary/20 transition-transform active:scale-90 disabled:bg-slate-800 disabled:text-slate-600'
+					className='p-3 bg-primary text-white rounded-full shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all disabled:bg-slate-800 disabled:text-slate-500 disabled:shadow-none'
 					disabled={!text.trim() && !imagePreview}
 				>
-					<Send size={18} />
+					<Send size={20} />
 				</button>
 			</form>
 		</div>

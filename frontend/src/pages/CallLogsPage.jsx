@@ -56,18 +56,14 @@ const CallLogsPage = () => {
     }, [socket, addCallLog]);
 
     return (
-        <div className='flex flex-col h-full bg-base-100/50 w-full overflow-hidden'>
-            <div className='bg-base-100/60 backdrop-blur-2xl border-b border-base-content/5 p-2 pt-8 shadow-sm'>
-                <div className="max-w-4xl mx-auto flex items-center justify-between">
-                    <h1 className='text-2xl font-extrabold text-base-content tracking-tight flex items-center gap-1.5'>
-                        <div className="p-2 bg-primary/10 rounded-xl">
-                            <Clock className='size-5 text-primary' />
-                        </div>
-                        Call History
-                    </h1>
-                    <div className="text-xs font-semibold text-base-content/40 bg-base-300/50 px-3 py-1.5 rounded-full border border-base-content/5">
-                        {callLogs.length} Calls
-                    </div>
+        <div className='flex flex-col h-full bg-slate-900/40 w-full overflow-hidden'>
+            <div className='px-4 py-3 border-b border-white/5 bg-slate-800/20 backdrop-blur-md sticky top-0 z-10 flex items-center justify-between'>
+                <div>
+                    <h1 className='text-xl font-bold text-slate-100'>Call History</h1>
+                    <p className="text-[10px] text-slate-500 font-medium tracking-wide uppercase">Your recent voice and video calls</p>
+                </div>
+                <div className="text-[10px] font-bold text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20 uppercase tracking-wider">
+                    {callLogs.length} Calls
                 </div>
             </div>
 
