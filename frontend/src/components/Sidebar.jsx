@@ -63,7 +63,7 @@ const Sidebar = () => {
 
             {/* Search bar */}
             <form onSubmit={handleSearch} className='mb-6'>
-                <div className="flex items-center gap-2 p-1.5 bg-base-200/50 rounded-xl border border-white/5 focus-within:border-primary/30 transition-all">
+                <div className="flex items-center gap-2 p-1.5 glassy rounded-xl border border-white/5 focus-within:border-primary/30 transition-all">
                     <div className="relative flex-1">
                         <Search className='absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-base-content/30' />
                         <input
@@ -91,7 +91,7 @@ const Sidebar = () => {
 
             {/* Search Result */}
             {searchResult && (
-                <div className="bg-base-300/40 backdrop-blur-md p-3 rounded-2xl mb-4 animate-in fade-in slide-in-from-top-2 border border-white/10 shadow-sm">
+                <div className="glassy p-3 rounded-2xl mb-4 animate-in fade-in slide-in-from-top-2 border border-white/10 shadow-sm">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <img src={searchResult.profilePic || "/avatar.png"} alt="avatar" className="size-8 rounded-full border" />
@@ -110,7 +110,7 @@ const Sidebar = () => {
                     <p className="text-xs font-semibold opacity-50 mb-2 px-1 uppercase tracking-wider">Friend Requests ({friendRequests.length})</p>
                     <div className="space-y-2 max-h-40 overflow-auto pr-1">
                         {friendRequests.map((req) => (
-                            <div key={req._id} className="bg-base-300/40 backdrop-blur-md p-2 rounded-xl flex items-center justify-between border border-white/10">
+                            <div key={req._id} className="glassy p-2 rounded-xl flex items-center justify-between border border-white/10">
                                 <div className="flex items-center gap-2">
                                     <img src={req.from.profilePic || "/avatar.png"} alt="avatar" className="size-6 rounded-full border" />
                                     <p className="text-xs font-medium truncate max-w-[80px]">{req.from.username}</p>

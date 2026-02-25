@@ -147,7 +147,7 @@ function App() {
     }
 
     return (
-        <div className="min-h-screen bg-base-200 transition-colors duration-500">
+        <div className="min-h-screen bg-gradient-to-tr from-base-200 via-base-100 to-primary/5 transition-colors duration-500">
             <Navbar />
             <main className='pt-16 min-h-[calc(100vh-64px)] flex items-center justify-center'>
                 <Routes>
