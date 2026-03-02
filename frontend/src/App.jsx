@@ -164,10 +164,12 @@ function App() {
                 </>
             ) : (
                 <div className='flex h-screen w-full overflow-hidden bg-slate-900/60 backdrop-blur-2xl'>
-                    {/* Sidebar Column - Only visible on desktop OR on mobile if not in a subview/chat */}
-                    <div className={`w-full md:w-[350px] lg:w-[400px] border-r border-slate-800/50 bg-slate-900/40 ${selectedUser || location.pathname !== '/' ? "hidden md:flex" : "flex"}`}>
-                        <Sidebar />
-                    </div>
+                    {/* Sidebar Column - Hidden during calls, visible on desktop OR on mobile if not in a subview/chat */}
+                    {location.pathname !== '/call' && (
+                        <div className={`w-full md:w-[350px] lg:w-[400px] border-r border-slate-800/50 bg-slate-900/40 ${selectedUser || location.pathname !== '/' ? "hidden md:flex" : "flex"}`}>
+                            <Sidebar />
+                        </div>
+                    )}
 
                     {/* Content Column - Main action area */}
                     <div className={`flex-1 flex flex-col min-h-0 overflow-hidden relative ${selectedUser || location.pathname !== '/' ? "flex" : "hidden md:flex"}`}>
