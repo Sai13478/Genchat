@@ -25,8 +25,8 @@ const getTurnServers = () => {
             "turn:openrelay.metered.ca:443?transport=tcp",
             "turns:openrelay.metered.ca:443?transport=tcp"
         ],
-        username: "openrelayproject",
-        credential: "openrelayproject",
+        username: "01c144b6367be1a94d4692b8",
+        credential: "VW74xDH75bNE64m1",
     }];
 };
 
