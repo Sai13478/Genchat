@@ -3,6 +3,33 @@ import toast from "react-hot-toast";
 
 let peerConnection;
 
+// Build TURN server config from environment variables (self-hosted) or fallback to free relay
+const getTurnServers = () => {
+    const turnUrl = import.meta.env.VITE_TURN_URL;
+    const turnUser = import.meta.env.VITE_TURN_USER;
+    const turnCred = import.meta.env.VITE_TURN_CREDENTIAL;
+
+    if (turnUrl && turnUser && turnCred) {
+        // Self-hosted coturn: support comma-separated URLs
+        const urls = turnUrl.split(",").map(u => u.trim());
+        console.log("Using self-hosted TURN server:", urls);
+        return [{ urls, username: turnUser, credential: turnCred }];
+    }
+
+    // Fallback: free Open Relay TURN server
+    console.log("Using fallback free TURN server (openrelay.metered.ca)");
+    return [{
+        urls: [
+            "turn:openrelay.metered.ca:80",
+            "turn:openrelay.metered.ca:443",
+            "turn:openrelay.metered.ca:443?transport=tcp",
+            "turns:openrelay.metered.ca:443?transport=tcp"
+        ],
+        username: "openrelayproject",
+        credential: "openrelayproject",
+    }];
+};
+
 const configuration = {
     bundlePolicy: "max-bundle",
     rtcpMuxPolicy: "require",
@@ -12,16 +39,7 @@ const configuration = {
         { urls: "stun:stun2.l.google.com:19302" },
         { urls: "stun:stun3.l.google.com:19302" },
         { urls: "stun:stun4.l.google.com:19302" },
-        {
-            urls: [
-                "turn:openrelay.metered.ca:80",
-                "turn:openrelay.metered.ca:443",
-                "turn:openrelay.metered.ca:443?transport=tcp",
-                "turns:openrelay.metered.ca:443?transport=tcp"
-            ],
-            username: "openrelayproject",
-            credential: "openrelayproject",
-        },
+        ...getTurnServers(),
     ],
 };
 
