@@ -148,7 +148,8 @@ export const useCallStore = create((set, get) => ({
             if (event.streams && event.streams[0]) {
                 const remoteStream = event.streams[0];
                 console.log(`Using stream from event. Tracks: ${remoteStream.getTracks().length}`);
-                set({ remoteStream });
+                // Create a new MediaStream reference to force Zustand re-render
+                set({ remoteStream: new MediaStream(remoteStream.getTracks()) });
             } else {
                 set((state) => {
                     const currentStream = state.remoteStream || new MediaStream();
