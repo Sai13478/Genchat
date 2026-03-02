@@ -161,6 +161,16 @@ export const useCallStore = create((set, get) => ({
                     return { remoteStream: new MediaStream(currentStream.getTracks()) };
                 });
             }
+
+            // When the track unmutes (starts receiving actual frames), force a stream
+            // update so the video element re-renders with the now-active track
+            event.track.onunmute = () => {
+                console.log(`Track ${event.track.kind} unmuted — forcing stream refresh`);
+                const currentRemote = get().remoteStream;
+                if (currentRemote) {
+                    set({ remoteStream: new MediaStream(currentRemote.getTracks()) });
+                }
+            };
         };
 
         peerConnection.onicecandidate = (event) => {

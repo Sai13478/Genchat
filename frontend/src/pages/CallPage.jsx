@@ -50,15 +50,23 @@ const CallPage = () => {
     }, [localStream]);
 
     useEffect(() => {
-        let isMounted = true;
         if (remoteStream && remoteVideoRef.current) {
+            const video = remoteVideoRef.current;
             console.log(`Assigning remote stream to video element. Tracks: ${remoteStream.getTracks().length}`);
-            remoteVideoRef.current.srcObject = remoteStream;
-            remoteVideoRef.current.play().catch((err) => {
-                if (err.name !== "AbortError") console.error("Remote video play error:", err);
-            });
+            video.srcObject = remoteStream;
+
+            const tryPlay = () => {
+                video.play().catch((err) => {
+                    if (err.name !== "AbortError") console.error("Remote video play error:", err);
+                });
+            };
+
+            // Play immediately and also when metadata loads (in case frames arrive late)
+            video.addEventListener("loadedmetadata", tryPlay);
+            tryPlay();
+
+            return () => video.removeEventListener("loadedmetadata", tryPlay);
         }
-        return () => { isMounted = false; };
     }, [remoteStream]);
 
     // Play remote audio for audio-only calls
@@ -157,14 +165,14 @@ const CallPage = () => {
             </div>
 
             {/* Remote Stream Content Area */}
-            <div className="flex-1 relative flex items-center justify-center p-4 sm:p-8 pt-20">
+            <div className="absolute inset-0 flex items-center justify-center">
                 {callType === "video" && remoteStream ? (
-                    <div className="w-full h-full relative flex items-center justify-center overflow-hidden rounded-3xl bg-black/40 shadow-inner">
+                    <div className="w-full h-full relative flex items-center justify-center overflow-hidden bg-black">
                         <video
                             ref={remoteVideoRef}
                             autoPlay
                             playsInline
-                            className='max-w-full max-h-full object-contain rounded-2xl shadow-2xl transition-all duration-700 bg-black'
+                            className='w-full h-full object-cover transition-all duration-700 bg-black'
                         />
                         {remoteStream.getVideoTracks().length === 0 && (
                             <div className="absolute inset-0 flex items-center justify-center bg-[#0b141a]">
