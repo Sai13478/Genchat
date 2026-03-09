@@ -162,12 +162,12 @@ io.on("connection", (socket) => {
   });
 
   // --- Typing Indicator ---
-  socket.on("typing", ({ to }) => {
-    io.to(to).emit("typing", { from: userId });
+  socket.on("typing", ({ to, username }) => {
+    io.to(to).emit("typing", { from: userId, username, to });
   });
 
   socket.on("stop-typing", ({ to }) => {
-    io.to(to).emit("stop-typing", { from: userId });
+    io.to(to).emit("stop-typing", { from: userId, to });
   });
 
   // --- Chat Features ---
@@ -198,15 +198,18 @@ io.on("connection", (socket) => {
   // Check for undelivered messages and notify senders
   (async () => {
     try {
-      const undeliveredMessages = await Message.find({ receiverId: userId, delivered: false });
-      if (undeliveredMessages.length > 0) {
-        // Group by sender to emit efficiently
-        const senderIds = [...new Set(undeliveredMessages.map(m => m.senderId.toString()))];
-        await Message.updateMany({ receiverId: userId, delivered: false }, { $set: { delivered: true } });
+      const mongoose = await import("mongoose");
+      if (mongoose.default.connection.readyState === 1) {
+        const undeliveredMessages = await Message.find({ receiverId: userId, delivered: false });
+        if (undeliveredMessages.length > 0) {
+          // Group by sender to emit efficiently
+          const senderIds = [...new Set(undeliveredMessages.map(m => m.senderId.toString()))];
+          await Message.updateMany({ receiverId: userId, delivered: false }, { $set: { delivered: true } });
 
-        senderIds.forEach(senderId => {
-          io.to(senderId).emit("messagesDelivered", { receiverId: userId });
-        });
+          senderIds.forEach(senderId => {
+            io.to(senderId).emit("messagesDelivered", { receiverId: userId });
+          });
+        }
       }
     } catch (error) {
       console.error("Error checking undelivered messages on connection:", error);

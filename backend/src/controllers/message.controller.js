@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import Conversation from "../models/conversation.model.js";
 import Message from "../models/message.model.js";
-// Socket imports will be handled dynamically inside functions to avoid circular dependencies
+import Group from "../models/group.model.js";
 
 export const getUsersForSidebar = async (req, res) => {
 	try {
@@ -18,17 +18,41 @@ export const getUsersForSidebar = async (req, res) => {
 			return res.status(404).json({ error: "User not found" });
 		}
 
-		// 2. Get all conversations for the logged-in user to sort friends by recency
+		// 2. Get all groups for the logged-in user
+		const groups = await Group.find({ members: loggedInUserId }).populate("admins", "username profilePic");
+
+		// 3. Get all conversations for the logged-in user to sort by recency
 		const conversations = await Conversation.find({
 			participants: loggedInUserId,
 		}).sort({ updatedAt: -1 });
 
-		// 3. Extract the other participant IDs from these conversations
-		const interactedUserIds = conversations.map(conv =>
-			conv.participants.find(p => p.toString() !== loggedInUserId.toString())
-		).filter(Boolean);
+		// Build sets of hidden and archived conversation IDs for this user
+		const hiddenConvIds = new Set(
+			conversations
+				.filter((c) => c.hiddenFor?.some((h) => h.userId?.toString() === loggedInUserId.toString()))
+				.map((c) => c._id.toString())
+		);
+		const archivedConvIds = new Set(
+			conversations
+				.filter((c) => c.archivedFor?.some((id) => id?.toString() === loggedInUserId.toString()))
+				.map((c) => c._id.toString())
+		);
 
-		// 4. Sort the friends: those in interactedUserIds first (maintaining order), then the rest
+		// Build a map: otherId  → conversationId (for 1-1 chats)
+		const userToConvMap = {};
+		conversations.filter(c => !c.isGroup).forEach(c => {
+			const otherId = c.participants.find(p => p.toString() !== loggedInUserId.toString());
+			if (otherId) userToConvMap[otherId.toString()] = c._id.toString();
+		});
+
+		// 4. Extract categories
+		const interactedUserIds = conversations
+			.filter(c => !c.isGroup)
+			.map(conv =>
+				conv.participants.find(p => p.toString() !== loggedInUserId.toString())
+			).filter(Boolean);
+
+		// 5. Sort the friends: those in interactedUserIds first, then the rest
 		const friends = user.friends || [];
 		const sortedFriends = [...friends].sort((a, b) => {
 			const idA = a._id?.toString();
@@ -41,20 +65,43 @@ export const getUsersForSidebar = async (req, res) => {
 			if (indexA !== -1) return -1;
 			if (indexB !== -1) return 1;
 
-			// Fallback to email or "User" if username is missing (for older users)
 			const nameA = a.username || a.email || "User";
 			const nameB = b.username || b.email || "User";
 			return nameA.localeCompare(nameB);
 		});
 
-		// Ensure every friend has a tag and username fallback for the frontend
-		const finalFriends = sortedFriends.map(f => ({
-			...f.toObject ? f.toObject() : f,
-			username: f.username || f.email?.split("@")[0] || "User",
-			tag: f.tag || "0000"
-		}));
+		// 6. Format friends — attach conversationId, exclude hidden/archived
+		const finalFriends = sortedFriends
+			.map(f => {
+				const convId = userToConvMap[f._id.toString()];
+				return {
+					...f.toObject ? f.toObject() : f,
+					username: f.username || f.email?.split("@")[0] || "User",
+					tag: f.tag || "0000",
+					isGroup: false,
+					conversationId: convId,
+					isHidden: convId ? hiddenConvIds.has(convId) : false,
+					isArchived: convId ? archivedConvIds.has(convId) : false,
+				};
+			})
+			.filter(f => !f.isHidden && !f.isArchived);
 
-		res.status(200).json(finalFriends);
+		// 7. Format groups — exclude hidden/archived
+		const finalGroups = groups
+			.map(g => {
+				const conv = conversations.find(c => c.isGroup && c.groupId?.toString() === g._id.toString());
+				const convId = conv?._id.toString();
+				return {
+					...g.toObject(),
+					isGroup: true,
+					conversationId: convId,
+					isHidden: convId ? hiddenConvIds.has(convId) : false,
+					isArchived: convId ? archivedConvIds.has(convId) : false,
+				};
+			})
+			.filter(g => !g.isHidden && !g.isArchived);
+
+		res.status(200).json([...finalGroups, ...finalFriends]);
 	} catch (error) {
 		console.error("Error in getUsersForSidebar: ", error);
 		res.status(500).json({ error: "Internal server error" });
@@ -315,46 +362,87 @@ export const rejectFriendRequest = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
 	try {
-		const { text, image } = req.body;
-		const { id: receiverId } = req.params;
+		const { text, image, replyTo, isGroup } = req.body;
+		const { id: targetId } = req.params; // receiverId or groupId
 		const senderId = req.user._id;
 
-		let conversation = await Conversation.findOne({
-			participants: { $all: [senderId, receiverId] },
-		});
+		let conversation;
+		let newMessage;
 
-		if (!conversation) {
-			conversation = await Conversation.create({
-				participants: [senderId, receiverId],
+		if (isGroup) {
+			conversation = await Conversation.findOne({ groupId: targetId });
+			if (!conversation) return res.status(404).json({ error: "Group conversation not found" });
+
+			const group = await Group.findById(targetId);
+			if (!group) return res.status(404).json({ error: "Group not found" });
+
+			// Check broadcast settings
+			if (group.settings?.sendMessages) {
+				const isAdmin = group.admins.some(id => id.toString() === senderId.toString());
+				if (!isAdmin) {
+					return res.status(403).json({ error: "Only admins can send messages to this group" });
+				}
+			}
+
+			newMessage = new Message({
+				senderId,
+				groupId: targetId,
+				text,
+				image: image || "",
+				conversationId: conversation._id,
+				replyTo: replyTo || null,
 			});
-		}
+		} else {
+			conversation = await Conversation.findOne({
+				participants: { $all: [senderId, targetId] },
+				isGroup: false,
+			});
 
-		const newMessage = new Message({
-			senderId,
-			receiverId,
-			text,
-			image: image || "",
-			conversationId: conversation._id,
-		});
+			if (!conversation) {
+				conversation = await Conversation.create({
+					participants: [senderId, targetId],
+					isGroup: false,
+				});
+			}
+
+			newMessage = new Message({
+				senderId,
+				receiverId: targetId,
+				text,
+				image: image || "",
+				conversationId: conversation._id,
+				replyTo: replyTo || null,
+			});
+
+			// Check if receiver is online
+			const { getReceiverSocketIds } = await import("../lib/socket.js");
+			const receiverSocketIds = getReceiverSocketIds(targetId);
+			if (receiverSocketIds.size > 0) {
+				newMessage.delivered = true;
+			}
+		}
 
 		if (newMessage) {
 			conversation.messages.push(newMessage._id);
 		}
 
-		// Check if receiver is online
-		const { getReceiverSocketIds } = await import("../lib/socket.js");
-		const receiverSocketIds = getReceiverSocketIds(receiverId);
-		if (receiverSocketIds.size > 0) {
-			newMessage.delivered = true;
-		}
-
-		// this will run in parallel
 		await Promise.all([conversation.save(), newMessage.save()]);
 
-		// SOCKET.IO - Emit the event to the receiver's room
+		// SOCKET.IO
 		const { getIO } = await import("../lib/socket.js");
 		const io = getIO();
-		io.to(receiverId).emit("newMessage", newMessage);
+
+		if (isGroup) {
+			// Emit to all members of the group
+			const group = await Group.findById(targetId);
+			group.members.forEach(memberId => {
+				if (memberId.toString() !== senderId.toString()) {
+					io.to(memberId.toString()).emit("newGroupMessage", { ...newMessage.toObject(), groupId: targetId });
+				}
+			});
+		} else {
+			io.to(targetId).emit("newMessage", newMessage);
+		}
 
 		res.status(201).json(newMessage);
 	} catch (error) {
@@ -365,18 +453,145 @@ export const sendMessage = async (req, res) => {
 
 export const getMessages = async (req, res) => {
 	try {
-		const { id: userToChatId } = req.params;
+		const { id: targetId } = req.params;
 		const senderId = req.user._id;
+		const { isGroup } = req.query;
 
-		const conversation = await Conversation.findOne({
-			participants: { $all: [senderId, userToChatId] },
-		}).populate("messages"); // NOT REFERENCES, BUT ACTUAL MESSAGES
+		let messages;
+		if (isGroup === "true") {
+			// For groups, query by groupId directly
+			messages = await Message.find({ groupId: targetId }).sort({ createdAt: 1 });
+		} else {
+			// For DMs, query all messages between the two users in either direction
+			messages = await Message.find({
+				$or: [
+					{ senderId: senderId, receiverId: targetId },
+					{ senderId: targetId, receiverId: senderId },
+				],
+			}).sort({ createdAt: 1 });
+		}
 
-		if (!conversation) return res.status(200).json([]);
-
-		res.status(200).json(conversation.messages);
+		res.status(200).json(messages);
 	} catch (error) {
 		console.error("Error in getMessages controller: ", error);
+		res.status(500).json({ error: "Internal server error" });
+	}
+};
+export const editMessage = async (req, res) => {
+	try {
+		const { id: messageId } = req.params;
+		const { text } = req.body;
+		const userId = req.user._id;
+
+		const message = await Message.findById(messageId);
+		if (!message) return res.status(404).json({ error: "Message not found" });
+
+		if (message.senderId.toString() !== userId.toString()) {
+			return res.status(403).json({ error: "Unauthorized" });
+		}
+
+		message.text = text;
+		message.isEdited = true;
+		await message.save();
+
+		// SOCKET.IO
+		const { getIO } = await import("../lib/socket.js");
+		const io = getIO();
+
+		const targetId = message.groupId || message.receiverId;
+		io.to(targetId.toString()).emit("messageUpdated", message);
+		io.to(userId.toString()).emit("messageUpdated", message); // Notify other devices of sender
+
+		res.status(200).json(message);
+	} catch (error) {
+		console.error("Error in editMessage: ", error);
+		res.status(500).json({ error: "Internal server error" });
+	}
+};
+
+export const deleteMessage = async (req, res) => {
+	try {
+		const { id: messageId } = req.params;
+		const userId = req.user._id;
+
+		const message = await Message.findById(messageId);
+		if (!message) return res.status(404).json({ error: "Message not found" });
+
+		if (message.senderId.toString() !== userId.toString()) {
+			return res.status(403).json({ error: "Unauthorized" });
+		}
+
+		await Message.findByIdAndDelete(messageId);
+
+		// SOCKET.IO
+		const { getIO } = await import("../lib/socket.js");
+		const io = getIO();
+
+		const targetId = message.groupId || message.receiverId;
+		io.to(targetId.toString()).emit("messageDeleted", messageId);
+		io.to(userId.toString()).emit("messageDeleted", messageId);
+
+		res.status(200).json({ message: "Message deleted" });
+	} catch (error) {
+		console.error("Error in deleteMessage: ", error);
+		res.status(500).json({ error: "Internal server error" });
+	}
+};
+
+export const reactToMessage = async (req, res) => {
+	try {
+		const { id: messageId } = req.params;
+		const { emoji } = req.body;
+		const userId = req.user._id;
+
+		const message = await Message.findById(messageId);
+		if (!message) return res.status(404).json({ error: "Message not found" });
+
+		// Remove existing reaction from this user if any
+		message.reactions = message.reactions.filter(r => r.userId.toString() !== userId.toString());
+
+		// Add new reaction
+		if (emoji) {
+			message.reactions.push({ userId, emoji });
+		}
+
+		await message.save();
+
+		// SOCKET.IO
+		const { getIO } = await import("../lib/socket.js");
+		const io = getIO();
+		const targetId = message.groupId || message.receiverId;
+		io.to(targetId.toString()).emit("messageUpdated", message);
+		io.to(userId.toString()).emit("messageUpdated", message);
+
+		res.status(200).json(message);
+	} catch (error) {
+		console.error("Error in reactToMessage: ", error);
+		res.status(500).json({ error: "Internal server error" });
+	}
+};
+
+export const pinMessage = async (req, res) => {
+	try {
+		const { id: messageId } = req.params;
+		const userId = req.user._id;
+
+		const message = await Message.findById(messageId);
+		if (!message) return res.status(404).json({ error: "Message not found" });
+
+		message.isPinned = !message.isPinned;
+		await message.save();
+
+		// SOCKET.IO
+		const { getIO } = await import("../lib/socket.js");
+		const io = getIO();
+		const targetId = message.groupId || message.receiverId;
+		io.to(targetId.toString()).emit("messageUpdated", message);
+		io.to(userId.toString()).emit("messageUpdated", message);
+
+		res.status(200).json(message);
+	} catch (error) {
+		console.error("Error in pinMessage: ", error);
 		res.status(500).json({ error: "Internal server error" });
 	}
 };

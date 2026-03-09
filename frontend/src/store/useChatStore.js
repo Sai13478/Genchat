@@ -10,7 +10,14 @@ export const useChatStore = create((set, get) => ({
   friendRequests: [],
   isUsersLoading: false,
   isMessagesLoading: false,
-  isTyping: false,
+  typingUsers: [],
+  replyingTo: null,
+  editingMessage: null,
+  archivedChats: [],
+  hiddenChats: [],
+  isVaultOpen: false,
+
+  setVaultOpen: (isOpen) => set({ isVaultOpen: isOpen }),
 
   getUsers: async () => {
     set({ isUsersLoading: true });
@@ -78,10 +85,10 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  getMessages: async (userId) => {
+  getMessages: async (id, isGroup = false) => {
     set({ isMessagesLoading: true, messages: [] });
     try {
-      const res = await apiClient.get(`/messages/${userId}`);
+      const res = await apiClient.get(`/messages/${id}?isGroup=${isGroup}`);
       set({ messages: res.data });
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to load messages");
@@ -91,19 +98,150 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  sendMessage: async (messageData) => {
-    const { selectedUser, messages, users } = get();
-    if (!selectedUser) return toast.error("No user selected");
+  sendMessage: async (messageData, isGroup = false) => {
+    const { selectedUser, messages, users, replyingTo } = get();
+    if (!selectedUser) return toast.error("No selection");
 
     try {
-      const res = await apiClient.post(`/messages/send/${selectedUser._id}`, messageData);
-      set({ messages: [...messages, res.data] });
+      const res = await apiClient.post(`/messages/send/${selectedUser._id}`, {
+        ...messageData,
+        isGroup,
+        replyTo: replyingTo?._id
+      });
+      set({ messages: [...messages, res.data], replyingTo: null });
 
-      // Move messaged user to top
+      // Move to top
       const updatedUsers = users.filter((u) => u._id !== selectedUser._id);
       set({ users: [selectedUser, ...updatedUsers] });
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to send message");
+    }
+  },
+
+  editMessage: async (messageId, text) => {
+    try {
+      const res = await apiClient.put(`/messages/edit/${messageId}`, { text });
+      set({
+        messages: get().messages.map(m => m._id === messageId ? res.data : m)
+      });
+    } catch (error) {
+      toast.error("Failed to edit message");
+    }
+  },
+
+  deleteMessage: async (messageId) => {
+    try {
+      await apiClient.delete(`/messages/delete/${messageId}`);
+      set({
+        messages: get().messages.filter(m => m._id !== messageId)
+      });
+    } catch (error) {
+      toast.error("Failed to delete message");
+    }
+  },
+
+  addReaction: async (messageId, emoji) => {
+    try {
+      const res = await apiClient.post(`/messages/react/${messageId}`, { emoji });
+      set({
+        messages: get().messages.map(m => m._id === messageId ? res.data : m)
+      });
+    } catch (error) {
+      console.error("Failed to add reaction", error);
+    }
+  },
+
+  pinMessage: async (messageId) => {
+    try {
+      const res = await apiClient.post(`/messages/pin/${messageId}`);
+      set({
+        messages: get().messages.map(m => m._id === messageId ? res.data : m)
+      });
+      toast.success(res.data.isPinned ? "Message pinned" : "Message unpinned");
+    } catch (error) {
+      toast.error("Failed to pin message");
+    }
+  },
+
+  createGroup: async (groupData) => {
+    try {
+      const res = await apiClient.post("/groups/create", groupData);
+      toast.success("Group created successfully");
+      set({ users: [{ ...res.data, isGroup: true }, ...get().users] });
+      return res.data;
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to create group");
+    }
+  },
+
+  addMembers: async (groupId, membersToAdd) => {
+    try {
+      const res = await apiClient.post("/groups/add-members", { groupId, membersToAdd });
+      toast.success("Members added");
+      get().getUsers(); // Refresh users list
+      if (get().selectedUser?._id === groupId) {
+        set({ selectedUser: { ...get().selectedUser, ...res.data } });
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to add members");
+    }
+  },
+
+  removeMember: async (groupId, memberToRemove) => {
+    try {
+      const res = await apiClient.post("/groups/remove-member", { groupId, memberToRemove });
+      toast.success("Action completed");
+      get().getUsers(); // Refresh users list
+      if (get().selectedUser?._id === groupId) {
+        // If searching for self removal (leaving group)
+        const authUserId = useAuthStore.getState().authUser._id;
+        if (memberToRemove === authUserId) {
+          set({ selectedUser: null });
+        } else {
+          set({ selectedUser: { ...get().selectedUser, ...res.data } });
+        }
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to update member");
+    }
+  },
+
+  updateGroup: async (groupId, groupData) => {
+    try {
+      const res = await apiClient.put(`/groups/update/${groupId}`, groupData);
+      toast.success("Group updated");
+      get().getUsers();
+      if (get().selectedUser?._id === groupId) {
+        set({ selectedUser: { ...get().selectedUser, ...res.data } });
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to update group");
+    }
+  },
+
+  updateGroupSettings: async (groupId, settings) => {
+    try {
+      const res = await apiClient.put(`/groups/update/${groupId}`, { settings });
+      toast.success("Settings updated");
+      get().getUsers();
+      if (get().selectedUser?._id === groupId) {
+        set({ selectedUser: { ...get().selectedUser, ...res.data } });
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to update settings");
+    }
+  },
+
+  manageAdmin: async (groupId, memberId, action) => {
+    try {
+      const res = await apiClient.post("/groups/manage-admin", { groupId, memberId, action });
+      toast.success(`User ${action === 'promote' ? 'promoted' : 'demoted'}`);
+      get().getUsers();
+      if (get().selectedUser?._id === groupId) {
+        set({ selectedUser: { ...get().selectedUser, ...res.data } });
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to manage admin");
     }
   },
 
@@ -114,16 +252,35 @@ export const useChatStore = create((set, get) => ({
     const socket = useAuthStore.getState().socket;
 
     socket.on("newMessage", (newMessage) => {
-      if (newMessage.senderId !== selectedUser._id) return;
+      if (selectedUser.isGroup || newMessage.senderId !== selectedUser._id) return;
 
       set({
         messages: [...get().messages, newMessage],
       });
 
-      // Notify sender that message is delivered (receiver is online)
       socket.emit("markMessagesAsDelivered", {
         conversationId: selectedUser.conversationId,
         userIdOfSender: selectedUser._id
+      });
+    });
+
+    socket.on("newGroupMessage", (newMessage) => {
+      if (!selectedUser.isGroup || newMessage.groupId !== selectedUser._id) return;
+
+      set({
+        messages: [...get().messages, newMessage],
+      });
+    });
+
+    socket.on("messageUpdated", (updatedMessage) => {
+      set({
+        messages: get().messages.map(m => m._id === updatedMessage._id ? updatedMessage : m)
+      });
+    });
+
+    socket.on("messageDeleted", (messageId) => {
+      set({
+        messages: get().messages.filter(m => m._id !== messageId)
       });
     });
 
@@ -156,7 +313,7 @@ export const useChatStore = create((set, get) => ({
     });
 
     socket.on("friendRequestAccepted", (newFriend) => {
-      set({ users: [newFriend, ...get().users] });
+      set({ users: [{ ...newFriend, isGroup: false }, ...get().users] });
       toast.success(`${newFriend.username} accepted your friend request!`);
     });
   },
@@ -165,14 +322,82 @@ export const useChatStore = create((set, get) => ({
     const socket = useAuthStore.getState().socket;
     if (!socket) return;
     socket.off("newMessage");
+    socket.off("newGroupMessage");
+    socket.off("messageUpdated");
+    socket.off("messageDeleted");
     socket.off("messagesDelivered");
     socket.off("messagesSeen");
     socket.off("friendRequestReceived");
     socket.off("friendRequestAccepted");
   },
 
-  setSelectedUser: (selectedUser) => set({ selectedUser, messages: [] }),
+  setSelectedUser: (selectedUser) => set({ selectedUser, messages: [], replyingTo: null, editingMessage: null, typingUsers: [] }),
   setMessages: (messages) => set({ messages }),
   setUsers: (users) => set({ users }),
-  setTyping: (isTyping) => set({ isTyping }),
+  setTypingUsers: (userId, username, isTyping) => {
+    const { typingUsers } = get();
+    if (isTyping) {
+      if (!typingUsers.find(u => u.userId === userId)) {
+        set({ typingUsers: [...typingUsers, { userId, username }] });
+      }
+    } else {
+      set({ typingUsers: typingUsers.filter(u => u.userId !== userId) });
+    }
+  },
+  setReplyingTo: (message) => set({ replyingTo: message, editingMessage: null }),
+  setEditingMessage: (message) => set({ editingMessage: message, replyingTo: null }),
+
+  hideConversation: async (conversationId, secretKey) => {
+    try {
+      await apiClient.post(`/conversations/hide/${conversationId}`, { secretKey });
+      // Remove from active users list
+      set((state) => ({ users: state.users.filter((u) => u.conversationId !== conversationId) }));
+      toast.success("Chat hidden successfully!");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to hide chat.");
+    }
+  },
+
+  unhideConversation: async (conversationId, secretKey) => {
+    try {
+      await apiClient.post(`/conversations/unhide/${conversationId}`, { secretKey });
+      toast.success("Chat unlocked!");
+      // Refresh all lists
+      get().getUsers();
+      get().loadArchivedChats();
+      get().loadHiddenChats();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Incorrect secret key.");
+    }
+  },
+
+  toggleArchive: async (conversationId) => {
+    try {
+      const res = await apiClient.post(`/conversations/archive/${conversationId}`);
+      toast.success(res.data.message);
+      // Refresh to update archived state
+      get().getUsers();
+      get().loadArchivedChats();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to update archive.");
+    }
+  },
+
+  loadArchivedChats: async () => {
+    try {
+      const res = await apiClient.get("/conversations/archived");
+      set({ archivedChats: res.data });
+    } catch (error) {
+      console.error("Failed to load archived chats", error);
+    }
+  },
+
+  loadHiddenChats: async () => {
+    try {
+      const res = await apiClient.get("/conversations/hidden");
+      set({ hiddenChats: res.data });
+    } catch (error) {
+      console.error("Failed to load hidden chats", error);
+    }
+  },
 }));

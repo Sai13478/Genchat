@@ -8,11 +8,9 @@ import Sidebar from "./components/Sidebar";
 import HomePage from "./pages/HomePage";
 import SignUpPage from "./pages/SignUpPage";
 import LoginPage from "./pages/LoginPage";
-import CallPage from "./pages/CallPage";
-import CallLogsPage from "./pages/CallLogsPage";
 import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
-import CallFailedPage from "./pages/CallFailedPage";
+import NotFoundPage from "./pages/NotFoundPage";
 import IncomingCallModal from "./components/IncomingCallModal";
 
 // State and Context
@@ -149,15 +147,16 @@ function App() {
     }
 
     return (
-        <div className="h-screen w-full flex flex-col nebula-mesh selection:bg-primary/30 selection:text-primary-content overflow-hidden" data-theme={theme}>
+        <div className="h-screen w-full flex flex-col orbit-bg selection:bg-blue-500/30 selection:text-white overflow-hidden" data-theme={theme}>
             {!authUser ? (
                 <>
                     <Navbar />
                     <div className='flex-1 flex flex-col min-h-0 overflow-hidden'>
                         <Routes>
+                            <Route path='/' element={<Navigate to="/login" />} />
                             <Route path='/signup' element={<SignUpPage />} />
                             <Route path='/login' element={<LoginPage />} />
-                            <Route path='*' element={<Navigate to="/login" />} />
+                            <Route path='*' element={<NotFoundPage />} />
                         </Routes>
                         <Toaster />
                     </div>
@@ -175,12 +174,11 @@ function App() {
                     <div className={`flex-1 flex flex-col min-h-0 overflow-hidden relative ${selectedUser || location.pathname !== '/' ? "flex" : "hidden md:flex"}`}>
                         <Routes>
                             <Route path='/' element={<HomePage />} />
-                            <Route path='/call' element={<CallPage />} />
-                            <Route path='/call-logs' element={<CallLogsPage />} />
+                            <Route path='/login' element={<Navigate to="/" />} />
+                            <Route path='/signup' element={<Navigate to="/" />} />
                             <Route path='/profile' element={<ProfilePage />} />
                             <Route path='/settings' element={<SettingsPage />} />
-                            <Route path='/call-failed' element={<CallFailedPage />} />
-                            <Route path='*' element={<Navigate to="/" />} />
+                            <Route path='*' element={<NotFoundPage />} />
                         </Routes>
                         <Toaster />
                         <IncomingCallModal />

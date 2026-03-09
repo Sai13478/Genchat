@@ -4,17 +4,22 @@ import { useChatStore } from "../store/useChatStore";
 
 const useListenTyping = () => {
 	const { socket } = useSocket();
-	const { selectedUser, setTyping } = useChatStore();
+	const { selectedUser, setTypingUsers } = useChatStore();
 
 	useEffect(() => {
 		if (!socket) return;
 
-		const handleTyping = ({ from }) => {
-			if (from === selectedUser?._id) setTyping(true);
+		const handleTyping = ({ from, username, to }) => {
+			// If it's a direct chat or if I'm in the group the event was sent to
+			if (from === selectedUser?._id || to === selectedUser?._id) {
+				setTypingUsers(from, username, true);
+			}
 		};
 
-		const handleStopTyping = ({ from }) => {
-			if (from === selectedUser?._id) setTyping(false);
+		const handleStopTyping = ({ from, to }) => {
+			if (from === selectedUser?._id || to === selectedUser?._id) {
+				setTypingUsers(from, null, false);
+			}
 		};
 
 		socket.on("typing", handleTyping);
@@ -24,7 +29,7 @@ const useListenTyping = () => {
 			socket.off("typing", handleTyping);
 			socket.off("stop-typing", handleStopTyping);
 		};
-	}, [socket, selectedUser, setTyping]);
+	}, [socket, selectedUser, setTypingUsers]);
 };
 
 export default useListenTyping;

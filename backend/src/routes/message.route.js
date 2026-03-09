@@ -7,7 +7,11 @@ import {
     sendFriendRequest,
     getFriendRequests,
     acceptFriendRequest,
-    rejectFriendRequest
+    rejectFriendRequest,
+    editMessage,
+    deleteMessage,
+    reactToMessage,
+    pinMessage
 } from "../controllers/message.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 
@@ -23,5 +27,9 @@ router.post("/friend-request/:id", protectRoute, sendFriendRequest);
 router.get("/:id", protectRoute, getMessages);
 
 router.post("/send/:id", protectRoute, sendMessage);
+router.put("/edit/:id", protectRoute, editMessage);
+router.delete("/delete/:id", protectRoute, deleteMessage);
+router.post("/react/:id", protectRoute, reactToMessage);
+router.post("/pin/:id", protectRoute, pinMessage);
 
 export default router;

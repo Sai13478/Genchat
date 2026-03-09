@@ -9,7 +9,9 @@ import passkeyRoutes from "./routes/passkey.route.js";
 // Route imports
 import authRoutes from "./routes/auth.route.js";
 import messageRoutes from "./routes/message.route.js";
+import groupRoutes from "./routes/group.route.js";
 import callLogRoutes from "./routes/call.route.js";
+import conversationRoutes from "./routes/conversation.route.js";
 
 dotenv.config();
 
@@ -38,8 +40,10 @@ app.options('*', cors(corsOptions)); // <-- use the same options here
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/groups", groupRoutes);
 app.use("/api/v1/users/call-logs", callLogRoutes);
 app.use("/api/passkeys", passkeyRoutes);
+app.use("/api/conversations", conversationRoutes);
 
 const __dirname = path.resolve();
 

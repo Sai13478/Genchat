@@ -7,22 +7,32 @@ const Conversation = ({ conversation, isOnline }) => {
 	return (
 		<>
 			<div
-				className={`flex gap-3 items-center hover:bg-slate-800/60 rounded-xl p-3 cursor-pointer transition-all duration-300 group
-				${isSelected ? "bg-slate-800 shadow-lg border border-slate-700" : "border border-transparent"}
-			`}
 				onClick={() => setSelectedUser(conversation)}
+				className={`flex gap-3 items-center hover:bg-[#202c33] p-3 cursor-pointer transition-colors duration-200
+				${isSelected ? "bg-[#202c33]" : ""}
+			`}
 			>
-				<div className={`avatar ${isOnline ? "online" : ""}`}>
-					<div className='w-12 rounded-xl'>
-						<img src={conversation.profilePic || "/avatar.png"} alt='user avatar' />
+				<div className={`avatar ${!conversation.isGroup && isOnline ? "online" : ""}`}>
+					<div className='w-12 rounded-full border border-white/5 bg-[#202c33] flex items-center justify-center overflow-hidden'>
+						<img src={conversation.isGroup ? (conversation.image || "/group.png") : (conversation.profilePic || "/avatar.png")} alt='avatar' className="object-cover w-full h-full" />
 					</div>
 				</div>
 
 				<div className='flex flex-col flex-1 min-w-0'>
-					<p className={`font-bold transition-all duration-300 ${isSelected ? "text-primary tracking-tight" : "text-slate-300 group-hover:text-white"}`}>
-						{conversation.username}
-						<span className='text-[10px] text-slate-500 ml-1 font-medium'>#{conversation.tag}</span>
-					</p>
+					<div className="flex justify-between items-baseline">
+						<p className={`font-medium truncate ${isSelected ? "text-white" : "text-[#e9edef]"}`}>
+							{conversation.isGroup ? conversation.name : conversation.username}
+						</p>
+						{!conversation.isGroup && (
+							<span className='text-[10px] text-slate-500 font-medium'>#{conversation.tag}</span>
+						)}
+						{conversation.isGroup && (
+							<span className='text-[10px] text-blue-400 font-medium'>Group</span>
+						)}
+					</div>
+					{conversation.isGroup && conversation.description && (
+						<p className="text-xs text-slate-500 truncate">{conversation.description}</p>
+					)}
 				</div>
 			</div>
 			<div className='border-b border-white/5 mx-4' />

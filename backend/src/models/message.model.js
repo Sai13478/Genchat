@@ -12,12 +12,15 @@ const messageSchema = new mongoose.Schema(
     receiverId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+    },
+    groupId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Group",
     },
     text: {
       type: String,
-      set: (v) => encrypt(v),
-      get: (v) => decrypt(v),
+      set: (v) => v ? encrypt(v) : v,
+      get: (v) => v ? decrypt(v) : v,
     },
     image: {
       type: String,
@@ -27,6 +30,24 @@ const messageSchema = new mongoose.Schema(
       default: false,
     },
     delivered: {
+      type: Boolean,
+      default: false,
+    },
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+    },
+    reactions: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        emoji: String,
+      },
+    ],
+    isPinned: {
+      type: Boolean,
+      default: false,
+    },
+    isEdited: {
       type: Boolean,
       default: false,
     },

@@ -8,12 +8,29 @@ const conversationSchema = new mongoose.Schema(
 				ref: "User",
 			},
 		],
+		isGroup: {
+			type: Boolean,
+			default: false,
+		},
+		groupId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "Group",
+		},
 		messages: [
 			{
 				type: mongoose.Schema.Types.ObjectId,
 				ref: "Message",
 				default: [],
 			},
+		],
+		hiddenFor: [
+			{
+				userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+				secretKey: { type: String },
+			},
+		],
+		archivedFor: [
+			{ type: mongoose.Schema.Types.ObjectId, ref: "User" },
 		],
 	},
 	{ timestamps: true }
