@@ -185,3 +185,28 @@ export const removeMember = async (req, res) => {
         res.status(500).json({ error: "Internal server error" });
     }
 };
+export const deleteGroup = async (req, res) => {
+    try {
+        const { groupId } = req.params;
+        const userId = req.user._id;
+
+        const group = await Group.findById(groupId);
+        if (!group) return res.status(404).json({ error: "Group not found" });
+
+        // Only admins can delete the group
+        const isAdmin = group.admins.some(id => id.toString() === userId.toString());
+        if (!isAdmin) {
+            return res.status(403).json({ error: "Only admins can delete the group" });
+        }
+
+        // Delete group, conversation and messages
+        await Group.findByIdAndDelete(groupId);
+        await Conversation.findOneAndDelete({ groupId });
+        await Message.deleteMany({ groupId });
+
+        res.status(200).json({ message: "Group deleted successfully" });
+    } catch (error) {
+        console.error("Error in deleteGroup: ", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+};

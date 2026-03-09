@@ -168,31 +168,90 @@ export const checkAuth = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
 	try {
-		const { profilePic } = req.body;
+		const { profilePic, username, bio } = req.body;
 		const userId = req.user._id;
 
 		const user = await User.findById(userId);
 		if (!user) return res.status(404).json({ error: "User not found" });
 
-		if (user.profilePic) {
-			const publicId = user.profilePic.split("/").pop().split(".")[0];
-			await cloudinary.uploader.destroy(`profile_pics/${publicId}`);
+		if (username) user.username = username;
+		if (bio !== undefined) user.bio = bio;
+
+		if (profilePic) {
+			if (user.profilePic) {
+				const publicId = user.profilePic.split("/").pop().split(".")[0];
+				try {
+					await cloudinary.uploader.destroy(`profile_pics/${publicId}`);
+				} catch (destroyError) {
+					console.error("Cloudinary destroy error:", destroyError);
+				}
+			}
+
+			const uploadedResponse = await cloudinary.uploader.upload(profilePic, {
+				folder: "profile_pics",
+				width: 250,
+				height: 250,
+				crop: "fill",
+			});
+			user.profilePic = uploadedResponse.secure_url;
 		}
 
-		const uploadedResponse = await cloudinary.uploader.upload(profilePic, {
-			folder: "profile_pics",
-			width: 250,
-			height: 250,
-			crop: "fill",
-		});
-
-		user.profilePic = uploadedResponse.secure_url;
 		await user.save();
 
-		const userResponse = { _id: user._id, username: user.username, tag: user.tag, email: user.email, profilePic: user.profilePic };
+		const userResponse = {
+			_id: user._id,
+			username: user.username,
+			tag: user.tag,
+			email: user.email,
+			profilePic: user.profilePic,
+			bio: user.bio,
+			settings: user.settings
+		};
 		res.status(200).json({ message: "Profile updated successfully", user: userResponse });
 	} catch (error) {
 		console.error("Error in updateProfile controller:", error);
+		res.status(500).json({ error: "Internal Server Error" });
+	}
+};
+export const updateSettings = async (req, res) => {
+	try {
+		const { settings } = req.body;
+		const userId = req.user._id;
+
+		const user = await User.findById(userId);
+		if (!user) return res.status(404).json({ error: "User not found" });
+
+		// Deep merge or direct assign settings
+		if (settings) {
+			user.settings = {
+				...user.settings,
+				...settings,
+				accessibility: { ...user.settings.accessibility, ...settings.accessibility },
+				privacy: { ...user.settings.privacy, ...settings.privacy },
+				notifications: { ...user.settings.notifications, ...settings.notifications },
+			};
+		}
+
+		await user.save();
+		res.status(200).json({ message: "Settings updated successfully", settings: user.settings });
+	} catch (error) {
+		console.error("Error in updateSettings controller:", error);
+		res.status(500).json({ error: "Internal Server Error" });
+	}
+};
+
+export const getSessions = async (req, res) => {
+	try {
+		const sessions = await RefreshToken.find({ user: req.user._id });
+		const formattedSessions = sessions.map(s => ({
+			_id: s._id,
+			device: s.device || "Unknown Device",
+			location: "Unknown Location", // Placeholder as we don't store IP/Geo currently
+			current: req.cookies.refreshToken === s.token,
+		}));
+		res.status(200).json(formattedSessions);
+	} catch (error) {
+		console.error("Error in getSessions controller:", error);
 		res.status(500).json({ error: "Internal Server Error" });
 	}
 };

@@ -400,4 +400,33 @@ export const useChatStore = create((set, get) => ({
       console.error("Failed to load hidden chats", error);
     }
   },
+
+  deleteGroup: async (groupId) => {
+    try {
+      await apiClient.delete(`/groups/${groupId}`);
+      toast.success("Group deleted successfully");
+      get().getUsers();
+      if (get().selectedUser?._id === groupId) {
+        set({ selectedUser: null });
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to delete group");
+    }
+  },
+
+  forwardMessage: async (targetId, messageData, isGroup) => {
+    try {
+      const res = await apiClient.post(`/messages/send/${targetId}`, {
+        ...messageData,
+        isGroup,
+        forwarded: true // Optional flag for UI
+      });
+      // Optionally move target user/group to top
+      get().getUsers();
+      toast.success("Message forwarded!");
+      return res.data;
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to forward message");
+    }
+  },
 }));

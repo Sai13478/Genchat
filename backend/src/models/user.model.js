@@ -18,6 +18,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    bio: {
+      type: String,
+      default: "Hey there! I am using GenChat.",
+    },
     tag: {
       type: String,
       required: true,
@@ -53,6 +57,19 @@ const userSchema = new mongoose.Schema(
     // For WebAuthn
     authenticators: [authenticatorSchema],
     currentChallenge: { type: String },
+    settings: {
+      accessibility: {
+        fontSize: { type: String, default: "medium" },
+        highContrast: { type: Boolean, default: false },
+      },
+      privacy: {
+        readReceipts: { type: Boolean, default: true },
+      },
+      notifications: {
+        messageSounds: { type: Boolean, default: true },
+        desktopAlerts: { type: Boolean, default: true },
+      },
+    },
   },
   { timestamps: true }
 );

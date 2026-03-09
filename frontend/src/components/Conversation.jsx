@@ -1,13 +1,20 @@
 import { useChatStore } from "../store/useChatStore";
+import { useNavigate } from "react-router-dom";
 
 const Conversation = ({ conversation, isOnline }) => {
 	const { selectedUser, setSelectedUser } = useChatStore();
+	const navigate = useNavigate();
 	const isSelected = selectedUser?._id === conversation._id;
+
+	const handleClick = () => {
+		setSelectedUser(conversation);
+		navigate("/");
+	};
 
 	return (
 		<>
 			<div
-				onClick={() => setSelectedUser(conversation)}
+				onClick={handleClick}
 				className={`flex gap-3 items-center hover:bg-[#202c33] p-3 cursor-pointer transition-colors duration-200
 				${isSelected ? "bg-[#202c33]" : ""}
 			`}

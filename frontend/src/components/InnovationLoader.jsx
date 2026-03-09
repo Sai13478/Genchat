@@ -2,37 +2,37 @@ import React from 'react';
 import styled from 'styled-components';
 
 const InnovationLoader = () => {
-    return (
-        <StyledWrapper className="flex items-center justify-center w-full h-full min-h-[400px]">
-            <main id="container">
-                <div className="dots">
-                    <div className="dot" />
-                    <div className="dot" />
-                    <div className="dot" />
-                    <div className="dot" />
-                    <div className="dot" />
-                    <div className="dot" />
-                    <div className="dot" />
-                    <div className="dot" />
-                    <div className="dot" />
-                    <div className="dot" />
-                </div>
-                <div className="dots2">
-                    <div className="dot2" />
-                    <div className="dot2" />
-                    <div className="dot2" />
-                    <div className="dot2" />
-                    <div className="dot2" />
-                    <div className="dot2" />
-                    <div className="dot2" />
-                    <div className="dot2" />
-                    <div className="dot2" />
-                    <div className="dot2" />
-                </div>
-                <div className="circle" />
-            </main>
-        </StyledWrapper>
-    );
+  return (
+    <StyledWrapper className="flex items-center justify-center w-full h-full min-h-[100px]">
+      <main id="container">
+        <div className="dots">
+          <div className="dot" />
+          <div className="dot" />
+          <div className="dot" />
+          <div className="dot" />
+          <div className="dot" />
+          <div className="dot" />
+          <div className="dot" />
+          <div className="dot" />
+          <div className="dot" />
+          <div className="dot" />
+        </div>
+        <div className="dots2">
+          <div className="dot2" />
+          <div className="dot2" />
+          <div className="dot2" />
+          <div className="dot2" />
+          <div className="dot2" />
+          <div className="dot2" />
+          <div className="dot2" />
+          <div className="dot2" />
+          <div className="dot2" />
+          <div className="dot2" />
+        </div>
+        <div className="circle" />
+      </main>
+    </StyledWrapper>
+  );
 }
 
 const StyledWrapper = styled.div`
@@ -65,7 +65,7 @@ const StyledWrapper = styled.div`
     left: -50px;
     width: 0;
     height: 0;
-    border: 50px solid #3b82f6;
+    border: 50px solid #fffb10ff;
     border-radius: 50%;
     border-right-color: transparent;
     animation: chomp1 .25s ease-in-out 0s infinite normal forwards;
@@ -78,7 +78,7 @@ const StyledWrapper = styled.div`
     left: -50px;
     width: 0;
     height: 0;
-    border: 50px solid #3b82f6;
+    border: 50px solid #f9ea24ff;
     border-radius: 50%;
     border-right-color: transparent;
     animation: chomp2 .25s ease-in-out 0s infinite normal forwards;

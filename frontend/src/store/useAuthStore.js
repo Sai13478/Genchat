@@ -76,4 +76,25 @@ export const useAuthStore = create((set, get) => ({
       set({ isUpdatingProfile: false });
     }
   },
+
+  updateSettings: async (data) => {
+    try {
+      const res = await apiClient.put("/auth/update-settings", { settings: data });
+      set({ authUser: { ...get().authUser, settings: res.data.settings } });
+      toast.success("Settings updated");
+    } catch (error) {
+      console.error("Error updating settings:", error);
+      toast.error(error?.response?.data?.error || "Failed to update settings");
+    }
+  },
+
+  getSessions: async () => {
+    try {
+      const res = await apiClient.get("/auth/sessions");
+      return res.data;
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+      return [];
+    }
+  },
 }));

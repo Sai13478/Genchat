@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Camera, UserPlus, Shield, ShieldCheck, UserMinus, LogOut, Edit2, Check, Users, Settings, ShieldAlert } from "lucide-react";
+import { X, Camera, UserPlus, Shield, ShieldCheck, UserMinus, LogOut, Edit2, Check, Users, Settings, ShieldAlert, Trash2 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useSocket } from "../context/SocketContext";
 import toast from "react-hot-toast";
 
 const GroupProfileModal = ({ onClose }) => {
-    const { selectedUser, updateGroup, updateGroupSettings, manageAdmin, addMembers, removeMember, users } = useChatStore();
+    const { selectedUser, updateGroup, updateGroupSettings, manageAdmin, addMembers, removeMember, deleteGroup, users } = useChatStore();
     const { authUser } = useAuthStore();
     const { onlineUsers } = useSocket();
 
@@ -64,6 +64,13 @@ const GroupProfileModal = ({ onClose }) => {
     const handleToggleSetting = async (settingName, value) => {
         const newSettings = { ...selectedUser.settings, [settingName]: value };
         await updateGroupSettings(selectedUser._id, newSettings);
+    };
+
+    const handleDelete = async () => {
+        if (confirm("Are you sure you want to permanently delete this group? This action cannot be undone.")) {
+            await deleteGroup(selectedUser._id);
+            onClose();
+        }
     };
 
     const handleLeave = async () => {
@@ -347,6 +354,14 @@ const GroupProfileModal = ({ onClose }) => {
                     >
                         <LogOut size={18} /> Leave Group
                     </button>
+                    {isAdmin && (
+                        <button
+                            onClick={handleDelete}
+                            className="flex-1 py-3 px-4 rounded-2xl bg-error/10 text-error hover:bg-error/20 transition-all text-sm font-bold flex items-center justify-center gap-2 border border-error/20"
+                        >
+                            <Trash2 size={18} /> Delete Group
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

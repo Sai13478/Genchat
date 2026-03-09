@@ -30,6 +30,13 @@ const ChatContainer = () => {
       if (!selectedUser.isGroup) {
         socket?.emit("markMessagesAsSeen", { conversationId: selectedUser.conversationId, userIdOfSender: selectedUser._id });
       }
+
+      // Auto-reload every 2 seconds to refresh messages
+      const pollInterval = setInterval(() => {
+        getMessages(selectedUser._id, selectedUser.isGroup);
+      }, 2000);
+
+      return () => clearInterval(pollInterval);
     }
   }, [selectedUser?._id, selectedUser?.isGroup, getMessages, socket]);
 
