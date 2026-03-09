@@ -50,7 +50,7 @@ const StyledWrapper = styled.div`
     left: -100px;
     width: 0;
     height: 0;
-    border: 50px solid #3b82f6; /* Orbit Primary Blue */
+    border: 50px solid #f9ea24ff; /* Orbit Primary Blue */
     border-radius: 50%;
     border-right-color: transparent;
     animation: move 5s linear 0s infinite normal forwards;

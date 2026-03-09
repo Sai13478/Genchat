@@ -49,8 +49,8 @@ const ChatHeader = () => {
         <div className='flex flex-col bg-[#202c33] border-b border-white/5'>
             <div className='flex items-center justify-between px-4 py-2'>
                 <div
-                    className={`flex items-center gap-3 ${selectedUser.isGroup ? 'cursor-pointer hover:bg-white/5 px-2 py-1 rounded-xl transition-all' : ''}`}
-                    onClick={() => selectedUser.isGroup && setIsGroupModalOpen(true)}
+                    className="flex items-center gap-3 cursor-pointer hover:bg-white/5 px-2 py-1 rounded-xl transition-all"
+                    onClick={() => selectedUser.isGroup ? setIsGroupModalOpen(true) : navigate("/profile")}
                 >
                     {/* Back button - visible only on mobile */}
                     <button
