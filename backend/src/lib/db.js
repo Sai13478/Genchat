@@ -34,10 +34,11 @@ export const connectDB = async () => {
         socketTimeoutMS: 45000, // 45 seconds socket timeout
       };
 
-      console.log('Connecting to MongoDB...');
+      const sanitizedUri = process.env.MONGO_URI.replace(/:([^@]+)@/, ':****@');
+      console.log(`Connecting to MongoDB at: ${sanitizedUri}`);
       cached.promise = mongoose.connect(process.env.MONGO_URI, opts)
         .then((mongoose) => {
-          console.log(`MongoDB connected: ${mongoose.connection.host}`);
+          console.log(`MongoDB connected to host: ${mongoose.connection.host}`);
           return mongoose;
         });
     }
@@ -53,10 +54,10 @@ export const connectDB = async () => {
       codeName: error.codeName,
       stack: error.stack
     });
-    
+
     // In case of error, clear the cached promise to allow retries
     cached.promise = null;
-    
+
     // Rethrow the error to be handled by the application
     throw new Error(`Failed to connect to MongoDB: ${error.message}`);
   }
@@ -64,14 +65,14 @@ export const connectDB = async () => {
 
 // Handle MongoDB connection events
 mongoose.connection.on('error', (err) => {
-  console.error('MongoDB connection error:', err);  
+  console.error('MongoDB connection error:', err);
   if (err.message && err.message.match(/failed to connect to server/)) {
     console.error('Please check if MongoDB is running and accessible');
   }
 });
 
 mongoose.connection.on('disconnected', () => {
-  console.log('MongoDB disconnected');  
+  console.log('MongoDB disconnected');
 });
 
 mongoose.connection.on('reconnected', () => {
