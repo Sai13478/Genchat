@@ -32,7 +32,7 @@ app.use(helmet({
 // Rate Limiting
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per window
+  max: 500, // Relaxed for testing (was 100)
   message: { error: "Too many requests from this IP, please try again after 15 minutes" },
   standardHeaders: true,
   legacyHeaders: false,
@@ -40,7 +40,7 @@ const generalLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 5, // Limit each IP to 5 requests per minute for auth
+  max: 10, // Relaxed for testing (was 5)
   message: { error: "Too many authentication attempts, please try again after a minute" },
   standardHeaders: true,
   legacyHeaders: false,

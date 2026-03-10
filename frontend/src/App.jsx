@@ -11,6 +11,8 @@ import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
 import NotFoundPage from "./pages/NotFoundPage";
+import CallPage from "./pages/CallPage";
+import CallFailedPage from "./pages/CallFailedPage";
 import IncomingCallModal from "./components/IncomingCallModal";
 
 // State and Context
@@ -178,6 +180,8 @@ function App() {
                             <Route path='/signup' element={<Navigate to="/" />} />
                             <Route path='/profile' element={<ProfilePage />} />
                             <Route path='/settings' element={<SettingsPage />} />
+                            <Route path='/call' element={<CallPage />} />
+                            <Route path='/call-failed' element={<CallFailedPage />} />
                             <Route path='*' element={<NotFoundPage />} />
                         </Routes>
                         <Toaster />

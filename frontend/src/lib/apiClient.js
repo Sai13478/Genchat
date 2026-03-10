@@ -53,7 +53,10 @@ apiClient.interceptors.response.use(
 				const res = await axios.post(
 					`${apiClient.defaults.baseURL}/auth/refresh`,
 					{ refreshToken: savedRefreshToken },
-					{ withCredentials: true }
+					{
+						withCredentials: true,
+						headers: { "X-Genchat-Requested-With": "XMLHttpRequest" }
+					}
 				);
 
 				const { token, refreshToken: newRefreshToken } = res.data;
