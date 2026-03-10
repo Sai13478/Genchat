@@ -102,8 +102,9 @@ export const login = (req, res, next) => {
 
 export const refreshToken = async (req, res) => {
 	try {
-		// Accept refresh token from cookie OR request body (fallback for blocked cookies)
-		const token = req.cookies.refreshToken || req.body.refreshToken;
+		// Prefer body token (from localStorage) over cookie — cookies may be stale when
+		// browser Tracking Prevention blocks cookie updates after rotation
+		const token = req.body.refreshToken || req.cookies.refreshToken;
 		if (!token) return res.status(401).json({ error: "Refresh Token required" });
 
 		const payload = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);

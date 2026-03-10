@@ -81,8 +81,16 @@ io.on("connection", (socket) => {
   }
   userSocketMap.get(userId).add(socket.id);
 
-  // Notify all about current online presence
-  io.emit("getOnlineUsers", Array.from(userSocketMap.keys()));
+  // --- Secure Presence Logic ---
+  // 1. Notify only friends that this user is online
+  const friends = socket.user.friends || [];
+  friends.forEach(friendId => {
+    io.to(friendId.toString()).emit("userOnline", userId);
+  });
+
+  // 2. Send the user the list of their friends who are currently online
+  const onlineFriends = friends.filter(friendId => userSocketMap.has(friendId.toString()));
+  socket.emit("getOnlineFriends", onlineFriends);
 
   // Register Modular Handlers
   registerMessageHandlers(io, socket);
@@ -96,9 +104,13 @@ io.on("connection", (socket) => {
       userSockets.delete(socket.id);
       if (userSockets.size === 0) {
         userSocketMap.delete(userId);
+
+        // Notify only friends that this user is now offline
+        friends.forEach(friendId => {
+          io.to(friendId.toString()).emit("userOffline", userId);
+        });
       }
     }
-    io.emit("getOnlineUsers", Array.from(userSocketMap.keys()));
   });
 
   // Check for undelivered messages on connection

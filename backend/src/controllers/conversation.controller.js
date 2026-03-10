@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import Conversation from "../models/conversation.model.js";
 
 // POST /conversations/hide/:conversationId
@@ -20,13 +21,17 @@ export const hideConversation = async (req, res) => {
             return res.status(403).json({ message: "Forbidden." });
         }
 
+        // Hash the secret key before storing
+        const salt = await bcrypt.genSalt(10);
+        const hashedKey = await bcrypt.hash(secretKey, salt);
+
         // Remove existing entry for this user if any
         conversation.hiddenFor = conversation.hiddenFor.filter(
             (h) => String(h.userId) !== String(userId)
         );
 
-        // Add the new hidden entry
-        conversation.hiddenFor.push({ userId, secretKey });
+        // Add the new hidden entry with hashed key
+        conversation.hiddenFor.push({ userId, secretKey: hashedKey });
         await conversation.save();
 
         res.status(200).json({ message: "Conversation hidden successfully." });
@@ -55,7 +60,8 @@ export const unhideConversation = async (req, res) => {
             return res.status(400).json({ message: "This conversation is not hidden for you." });
         }
 
-        if (hiddenEntry.secretKey !== secretKey) {
+        const isMatch = await bcrypt.compare(secretKey, hiddenEntry.secretKey);
+        if (!isMatch) {
             return res.status(401).json({ message: "Incorrect secret key." });
         }
 

@@ -30,15 +30,29 @@ export const SocketContextProvider = ({ children }) => {
 			}
 
 			const newSocket = io(backendUrl, {
-				// No userId query needed; server authenticates via accessToken cookie
+				// Fallback: pass token in auth object; also send custom CSRF header
+				auth: {
+					token: `Bearer ${localStorage.getItem("genchat-token")}`
+				},
+				extraHeaders: {
+					"X-Genchat-Requested-With": "XMLHttpRequest"
+				},
 				transports: ['websocket', 'polling'], // Prioritize websocket
 				withCredentials: true, // Ensure cookies are sent for auth
 			});
 
 			setSocket(newSocket);
 
-			newSocket.on("getOnlineUsers", (users) => {
-				setOnlineUsers(users);
+			newSocket.on("getOnlineFriends", (friends) => {
+				setOnlineUsers(friends);
+			});
+
+			newSocket.on("userOnline", (userId) => {
+				setOnlineUsers((prev) => [...new Set([...prev, userId])]);
+			});
+
+			newSocket.on("userOffline", (userId) => {
+				setOnlineUsers((prev) => prev.filter((id) => id !== userId));
 			});
 
 			// Clean up the socket connection when the component unmounts or authUser changes

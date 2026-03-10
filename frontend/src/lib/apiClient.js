@@ -13,7 +13,10 @@ const getBaseURL = () => {
 const apiClient = axios.create({
 	baseURL: getBaseURL(),
 	withCredentials: true,
-	headers: { "Content-Type": "application/json" },
+	headers: {
+		"Content-Type": "application/json",
+		"X-Genchat-Requested-With": "XMLHttpRequest"
+	},
 });
 
 // Request interceptor: add Bearer token from localStorage to every request

@@ -376,6 +376,12 @@ export const sendMessage = async (req, res) => {
 			const group = await Group.findById(targetId);
 			if (!group) return res.status(404).json({ error: "Group not found" });
 
+			// Check if user is a member of the group
+			const isMember = group.members.some(id => id.toString() === senderId.toString());
+			if (!isMember) {
+				return res.status(403).json({ error: "You are not a member of this group" });
+			}
+
 			// Check broadcast settings
 			if (group.settings?.sendMessages) {
 				const isAdmin = group.admins.some(id => id.toString() === senderId.toString());
@@ -459,6 +465,15 @@ export const getMessages = async (req, res) => {
 
 		let messages;
 		if (isGroup === "true") {
+			const group = await Group.findById(targetId);
+			if (!group) return res.status(404).json({ error: "Group not found" });
+
+			// Check if user is a member of the group
+			const isMember = group.members.some(id => id.toString() === senderId.toString());
+			if (!isMember) {
+				return res.status(403).json({ error: "Access denied. You are not a member of this group." });
+			}
+
 			// For groups, query by groupId directly
 			messages = await Message.find({ groupId: targetId }).sort({ createdAt: 1 });
 		} else {

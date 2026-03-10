@@ -3,6 +3,8 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from "dotenv";
 import path from "path";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import passport from "./lib/passport.js";
 import passkeyRoutes from "./routes/passkey.route.js";
 
@@ -20,7 +22,48 @@ import { checkOrigin } from "./lib/origin.js";
 const app = express();
 
 app.set('trust proxy', 1); // Trust Render's proxy
-app.use(express.json({ limit: "50mb" }));
+
+// Security Headers
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false, // Disable CMS for now to avoid issues with inline icons/styles
+}));
+
+// Rate Limiting
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  message: { error: "Too many requests from this IP, please try again after 15 minutes" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 5, // Limit each IP to 5 requests per minute for auth
+  message: { error: "Too many authentication attempts, please try again after a minute" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use(generalLimiter);
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/signup", authLimiter);
+
+// CSRF Protection Middleware: Enforce custom header for state-changing requests
+app.use((req, res, next) => {
+  const safeMethods = ["GET", "HEAD", "OPTIONS"];
+  if (!safeMethods.includes(req.method)) {
+    const customHeader = req.headers["x-genchat-requested-with"];
+    if (customHeader !== "XMLHttpRequest") {
+      console.warn(`🛑 CSRF Attempt blocked: Missing/Invalid Header. Method: ${req.method}, Path: ${req.path}`);
+      return res.status(403).json({ error: "Security Policy Violation: CSRF Protection" });
+    }
+  }
+  next();
+});
+
+app.use(express.json({ limit: "1mb" })); // Reduced from 50mb for security
 app.use(cookieParser());
 app.use(passport.initialize());
 

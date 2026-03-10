@@ -29,7 +29,14 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
-      minlength: 6,
+      minlength: 8,
+      validate: {
+        validator: function (v) {
+          // At least one letter and one number
+          return /^(?=.*[A-Za-z])(?=.*\d).+$/.test(v);
+        },
+        message: props => "Password must contain at least one letter and one number!"
+      }
     },
     profilePic: {
       type: String,
