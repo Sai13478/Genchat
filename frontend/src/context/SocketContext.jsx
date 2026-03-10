@@ -30,9 +30,7 @@ export const SocketContextProvider = ({ children }) => {
 			}
 
 			const newSocket = io(backendUrl, {
-				query: {
-					userId: authUser._id,
-				},
+				// No userId query needed; server authenticates via accessToken cookie
 				transports: ['websocket', 'polling'], // Prioritize websocket
 				withCredentials: true, // Ensure cookies are sent for auth
 			});

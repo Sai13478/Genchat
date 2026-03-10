@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, Phone, Video, Search, MoreVertical, Pin, Info } from "lucide-react";
+import { ArrowLeft, Phone, Video, Search, MoreVertical, Pin, Info, X } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useSocket } from "../context/SocketContext";
 import { useCallStore } from "../store/useCallStore";
@@ -99,6 +99,19 @@ const ChatHeader = () => {
                         <button className="p-2 hover:bg-slate-700/50 rounded-full transition-all">
                             <Search size={20} />
                         </button>
+
+                        {/* Close Chat Button */}
+                        <button
+                            className="p-2 hover:bg-red-500/10 hover:text-red-400 rounded-full transition-all text-slate-400 relative z-50 cursor-pointer"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedUser(null);
+                            }}
+                            title="Close Chat"
+                        >
+                            <X size={20} />
+                        </button>
+
                         <button className="p-2 hover:bg-slate-700/50 rounded-full transition-all text-slate-500 cursor-not-allowed">
                             <MoreVertical size={20} />
                         </button>

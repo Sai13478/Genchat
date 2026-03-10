@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useThemeStore } from "../store/useThemeStore";
+import { useAuthStore } from "../store/useAuthStore";
 import {
   Moon, Sun, User, Shield, Smartphone,
-  Bell, Accessibility, Monitor, Lock, Trash2
+  Bell, Accessibility, Monitor, Lock, Trash2, ArrowLeft, LogOut
 } from "lucide-react";
-import { useAuthStore } from "../store/useAuthStore";
 import toast from "react-hot-toast";
 
 const PREVIEW_MESSAGES = [
@@ -13,8 +14,9 @@ const PREVIEW_MESSAGES = [
 ];
 
 const SettingsPage = () => {
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useThemeStore();
-  const { authUser, updateProfile, isUpdatingProfile, updateSettings, getSessions, logoutAllDevices } = useAuthStore();
+  const { authUser, updateProfile, isUpdatingProfile, updateSettings, getSessions, logoutAllDevices, logout } = useAuthStore();
   const [activeTab, setActiveTab] = useState("profile");
   const [sessions, setSessions] = useState([]);
 
@@ -269,9 +271,31 @@ const SettingsPage = () => {
 
   return (
     <div className="h-full w-full flex flex-col orbit-bg overflow-hidden">
-      <div className='px-6 py-4 border-b border-white/5 bg-[#202c33] shrink-0 z-10 shadow-lg'>
-        <h1 className="text-xl font-bold text-[#e9edef]">Settings</h1>
-        <p className="text-[10px] text-slate-500 font-bold tracking-[0.2em] uppercase opacity-70">Orbit Configuration</p>
+      <div className='px-6 py-4 border-b border-white/5 bg-[#202c33] shrink-0 z-10 shadow-lg flex items-center justify-between'>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={(e) => {
+              console.log("Settings Back Button Clicked");
+              e.preventDefault();
+              e.stopPropagation();
+              navigate("/");
+            }}
+            className="md:hidden p-2 hover:bg-white/5 rounded-full text-slate-400 relative z-[9999] cursor-pointer"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h1 className="text-xl font-bold text-[#e9edef]">Settings</h1>
+            <p className="text-[10px] text-slate-500 font-bold tracking-[0.2em] uppercase opacity-70">Orbit Configuration</p>
+          </div>
+        </div>
+        <button
+          onClick={logout}
+          className="md:hidden p-2 hover:bg-red-500/10 rounded-full text-slate-400 hover:text-red-400 transition-all"
+          title="Logout"
+        >
+          <LogOut size={20} />
+        </button>
       </div>
 
       <div className="flex-1 flex overflow-hidden">

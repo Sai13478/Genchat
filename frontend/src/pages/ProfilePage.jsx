@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/useAuthStore";
-import { Camera, Mail, User } from "lucide-react";
+import { Camera, Mail, User, ArrowLeft, LogOut } from "lucide-react";
 
 const ProfilePage = () => {
-  const { authUser, isUpdatingProfile, updateProfile } = useAuthStore();
+  const { authUser, isUpdatingProfile, updateProfile, logout } = useAuthStore();
   const [selectedImg, setSelectedImg] = useState(null);
+  const navigate = useNavigate();
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -23,9 +25,29 @@ const ProfilePage = () => {
 
   return (
     <div className="h-full w-full overflow-y-auto orbit-bg">
-      <div className='px-4 py-3 border-b border-white/5 bg-[#202c33] sticky top-0 z-10'>
-        <h1 className="text-xl font-bold text-[#e9edef]">Profile</h1>
-        <p className="text-[10px] text-slate-500 font-medium tracking-wide uppercase">Manage your personal information</p>
+      <div className='px-4 py-3 border-b border-white/5 bg-[#202c33] sticky top-0 z-10 flex items-center gap-3'>
+        <button
+          onClick={(e) => {
+            console.log("Profile Back Button Clicked");
+            e.preventDefault();
+            e.stopPropagation();
+            navigate("/");
+          }}
+          className="md:hidden p-2 hover:bg-white/5 rounded-full text-slate-400 relative z-[9999] cursor-pointer"
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <div className="flex-1">
+          <h1 className="text-xl font-bold text-[#e9edef]">Profile</h1>
+          <p className="text-[10px] text-slate-500 font-medium tracking-wide uppercase">Manage your personal information</p>
+        </div>
+        <button
+          onClick={logout}
+          className="md:hidden p-2 hover:bg-red-500/10 rounded-full text-slate-400 hover:text-red-400 transition-all"
+          title="Logout"
+        >
+          <LogOut size={20} />
+        </button>
       </div>
 
       <div className="w-full flex justify-center p-4 py-12">

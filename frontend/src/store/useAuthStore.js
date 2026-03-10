@@ -30,6 +30,13 @@ export const useAuthStore = create((set, get) => ({
       localStorage.setItem("genchat-token", res.data.token);
       set({ authUser: res.data });
       toast.success("Account created successfully");
+      // Fetch full user data in background
+      try {
+        const fullUser = await apiClient.get("/auth/check");
+        set({ authUser: fullUser.data });
+      } catch (e) {
+        console.error("Error fetching full user data after signup:", e);
+      }
     } catch (error) {
       toast.error(error?.response?.data?.error || "Signup failed");
     } finally {
@@ -42,8 +49,16 @@ export const useAuthStore = create((set, get) => ({
     try {
       const res = await apiClient.post("/auth/login", data);
       localStorage.setItem("genchat-token", res.data.token);
+      // Set initial user data so the app transitions to authenticated layout
       set({ authUser: res.data });
       toast.success("Logged in successfully");
+      // Fetch full user data in background to populate all fields (bio, settings, friends, etc.)
+      try {
+        const fullUser = await apiClient.get("/auth/check");
+        set({ authUser: fullUser.data });
+      } catch (e) {
+        console.error("Error fetching full user data after login:", e);
+      }
     } catch (error) {
       toast.error(error?.response?.data?.error || "Login failed");
     } finally {
@@ -66,8 +81,9 @@ export const useAuthStore = create((set, get) => ({
     set({ isUpdatingProfile: true });
     try {
       const res = await apiClient.put("/auth/update-profile", data);
-      // Update authUser with the new user data from the response
-      set({ authUser: res.data.user });
+      // Merge updated fields into existing authUser to preserve all state
+      const currentUser = get().authUser;
+      set({ authUser: { ...currentUser, ...res.data.user } });
       toast.success("Profile updated successfully");
     } catch (error) {
       console.error("Error in update profile:", error);

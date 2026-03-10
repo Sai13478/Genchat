@@ -85,16 +85,22 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  getMessages: async (id, isGroup = false) => {
-    set({ isMessagesLoading: true, messages: [] });
+  getMessages: async (id, isGroup = false, silent = false) => {
+    if (!silent) {
+      set({ isMessagesLoading: true, messages: [] });
+    }
     try {
       const res = await apiClient.get(`/messages/${id}?isGroup=${isGroup}`);
       set({ messages: res.data });
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to load messages");
-      set({ messages: [] });
+      if (!silent) {
+        set({ messages: [] });
+      }
     } finally {
-      set({ isMessagesLoading: false });
+      if (!silent) {
+        set({ isMessagesLoading: false });
+      }
     }
   },
 

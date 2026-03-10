@@ -2,25 +2,24 @@ import { useChatStore } from "../store/useChatStore";
 import { useEffect, useRef, useState } from "react";
 import ChatHeader from "./ChatHeader";
 import MessageInput from "./MessageInput";
-import InnovationLoader from "./InnovationLoader";
+import Loader from "./InnovationLoader"; // User renamed this to Loader in their edit
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime } from "../lib/utils";
-import useListenMessages from "../hooks/useListenMessages";
 import useListenTyping from "../hooks/useListenTyping";
 import { useSocket } from "../context/SocketContext";
 import { Check, CheckCheck, Reply, Trash2, Pin, Edit2, Forward, Smile, ShieldAlert } from "lucide-react";
 import ForwardModal from "./ForwardModal";
+import { motion, AnimatePresence } from "framer-motion";
 
 const ChatContainer = () => {
   const { messages, getMessages, isMessagesLoading, selectedUser, setReplyingTo, deleteMessage, pinMessage, addReaction, setEditingMessage } = useChatStore();
   const { authUser } = useAuthStore();
   const { socket } = useSocket();
-  const messageEndRef = useRef(null);
+  const scrollRef = useRef(null);
 
   const [forwardModalMessage, setForwardModalMessage] = useState(null);
+  const [hoveredMessageId, setHoveredMessageId] = useState(null);
 
-  // This custom hook now handles all real-time message listening.
-  // useListenMessages is now called globally in App.jsx to handle notifications
   useListenTyping();
 
   useEffect(() => {
@@ -31,163 +30,229 @@ const ChatContainer = () => {
         socket?.emit("markMessagesAsSeen", { conversationId: selectedUser.conversationId, userIdOfSender: selectedUser._id });
       }
 
-      // Auto-reload every 2 seconds to refresh messages
       const pollInterval = setInterval(() => {
-        getMessages(selectedUser._id, selectedUser.isGroup);
-      }, 2000);
+        getMessages(selectedUser._id, selectedUser.isGroup, true);
+      }, 10000);
 
       return () => clearInterval(pollInterval);
     }
   }, [selectedUser?._id, selectedUser?.isGroup, getMessages, socket]);
 
+  // Robust scrolling logic using scrollTop to avoid window-level displacement
   useEffect(() => {
-    if (messageEndRef.current && messages) {
-      messageEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (scrollRef.current && messages) {
+      const container = scrollRef.current;
+      // Use requestAnimationFrame for smoother integration with React's render cycle
+      requestAnimationFrame(() => {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: "smooth"
+        });
+      });
     }
   }, [messages]);
 
+  const onReact = (messageId, emoji) => {
+    addReaction(messageId, emoji);
+    setHoveredMessageId(null); // Close menu after reacting
+  };
+
   return (
-    <div className='flex-1 flex flex-col overflow-hidden bg-[#0b141a]'>
+    <div className='flex-1 flex flex-col overflow-hidden bg-[#0a0f14]'>
       <ChatHeader />
 
-      <div className='flex-1 overflow-y-auto p-4 space-y-4 chat-bg relative'>
+      <div
+        ref={scrollRef}
+        className='flex-1 overflow-y-auto p-2 space-y-6 chat-bg relative scrollbar-hide'
+      >
         {isMessagesLoading ? (
-          <InnovationLoader />
+          <div className="flex items-center justify-center h-full">
+            <Loader />
+          </div>
         ) : (
-          <>
-            {Array.isArray(messages) &&
-              messages.map((message) => {
-                const isMe = message.senderId === authUser._id;
+          <div className="flex flex-col gap-2">
+            <AnimatePresence initial={false}>
+              {Array.isArray(messages) &&
+                messages.map((message) => {
+                  const isMe = message.senderId === authUser._id;
+                  const isHovered = hoveredMessageId === message._id;
 
-                return (
-                  <div
-                    key={message._id}
-                    className={`group flex flex-col ${isMe ? "items-end" : "items-start"}`}
-                  >
-                    <div className={`chat ${isMe ? "chat-end" : "chat-start"} w-full`}>
-                      <div className='chat-image avatar'>
-                        <div className='size-10 rounded-full border border-white/5'>
-                          <img
-                            src={
-                              isMe
-                                ? authUser.profilePic || "/avatar.png"
-                                : message.senderProfilePic || "/avatar.png"
-                            }
-                            alt='avatar'
-                          />
-                        </div>
-                      </div>
-                      <div className='chat-header mb-1 flex items-center gap-2'>
-                        {!isMe && selectedUser.isGroup && (
-                          <span className="text-xs font-bold text-blue-400">{message.senderName || "User"}</span>
-                        )}
-                        <time className='text-[10px] opacity-50'>{formatMessageTime(message.createdAt)}</time>
-                      </div>
-
-                      <div className="relative flex items-center group/bubble max-w-[85%]">
-                        {/* Action Menu - Visible on hover */}
-                        <div className={`absolute top-0 ${isMe ? "-left-24" : "-right-28"} hidden group-hover/bubble:flex items-center gap-1 p-1 bg-[#202c33] border border-white/10 rounded-lg shadow-xl z-10 transition-all`}>
-                          <button onClick={() => setReplyingTo(message)} title="Reply" className="p-1 hover:bg-white/10 rounded"><Reply size={14} className="text-slate-400" /></button>
-
-                          <div className="relative group/reactions">
-                            <button className="p-1 hover:bg-white/10 rounded text-slate-400"><Smile size={14} /></button>
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/reactions:flex items-center gap-1 p-1.5 bg-[#111b21] border border-white/10 rounded-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-                              {["👍", "❤️", "😂", "😮", "😢", "🔥"].map(emoji => (
-                                <button key={emoji} onClick={() => addReaction(message._id, emoji)} className="hover:scale-125 transition-transform p-0.5">{emoji}</button>
-                              ))}
-                            </div>
+                  return (
+                    <motion.div
+                      key={message._id}
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ duration: 0.2 }}
+                      className={`group flex flex-col ${isMe ? "items-end" : "items-start"} relative`}
+                    >
+                      <div className={`chat ${isMe ? "chat-end" : "chat-start"} w-full max-w-[85%] md:max-w-[65%]`}>
+                        <div className='chat-image avatar mt-1'>
+                          <div className='size-10 rounded-full ring-2 ring-white/5 overflow-hidden shadow-xl'>
+                            <img
+                              src={
+                                isMe
+                                  ? authUser.profilePic || "/avatar.png"
+                                  : message.senderProfilePic || "/avatar.png"
+                              }
+                              alt='avatar'
+                              className="object-cover w-full h-full"
+                            />
                           </div>
-
-                          <button onClick={() => setForwardModalMessage(message)} title="Forward" className="p-1 hover:bg-white/10 rounded"><Forward size={14} className="text-slate-400" /></button>
-                          <button onClick={() => pinMessage(message._id)} title="Pin" className="p-1 hover:bg-white/10 rounded"><Pin size={14} className={message.isPinned ? "text-blue-400" : "text-slate-400"} /></button>
-                          {isMe && (
-                            <>
-                              <button onClick={() => setEditingMessage(message)} title="Edit" className="p-1 hover:bg-white/10 rounded"><Edit2 size={14} className="text-slate-400" /></button>
-                              <button onClick={() => deleteMessage(message._id)} title="Delete" className="p-1 hover:bg-error/20 rounded"><Trash2 size={14} className="text-error" /></button>
-                            </>
-                          )}
                         </div>
 
                         <div
-                          className={`chat-bubble flex flex-col p-3 rounded-2xl shadow-md w-full ${isMe
-                            ? "bg-blue-600 text-white"
-                            : "bg-[#202c33] text-[#e9edef]"} ${message.isPinned ? "ring-2 ring-blue-500/50" : ""}`}
+                          className="flex flex-col gap-1 relative"
+                          onMouseEnter={() => setHoveredMessageId(message._id)}
+                          onMouseLeave={() => setHoveredMessageId(null)}
                         >
-                          {message.isPinned && (
-                            <div className="flex items-center gap-1 text-[10px] text-blue-300 mb-1">
-                              <Pin size={10} /> Pinned
-                            </div>
-                          )}
-
-                          {message.replyTo && (
-                            <div className="bg-black/20 p-2 rounded-lg border-l-4 border-primary mb-2 text-xs opacity-80 cursor-pointer hover:bg-black/30 transition-all">
-                              <p className="font-bold text-primary mb-1">Replying to</p>
-                              <p className="truncate italic">"{messages.find(m => m._id === message.replyTo)?.text || "Original message"}"</p>
-                            </div>
-                          )}
-
-                          {message.image && (
-                            <img src={message.image} alt='Attachment' className='sm:max-w-[300px] rounded-xl mb-2 cursor-pointer hover:opacity-90 transition-all' />
-                          )}
-
-                          <div className="flex flex-col">
-                            {message.text && <p className="text-sm leading-relaxed">{message.text}</p>}
-                            <div className="flex justify-end items-center gap-1 mt-1">
-                              {message.isEdited && <span className="text-[9px] opacity-40 italic">edited</span>}
-                              {isMe && (
-                                <div className='opacity-80 flex gap-0.5 items-center'>
-                                  {message.seen ? (
-                                    <CheckCheck className='size-3 text-blue-400' />
-                                  ) : message.delivered ? (
-                                    <CheckCheck className='size-3 text-slate-500' />
-                                  ) : (
-                                    <Check className='size-3 text-slate-500' />
+                          {/* Reaction & Action Menu - High-End Floating Menu */}
+                          <AnimatePresence>
+                            {isHovered && (
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.8, y: 10 }}
+                                className={`absolute -top-14 ${isMe ? "right-4" : "left-4"} flex items-center gap-2 p-2.5 bg-[#1a2329]/95 backdrop-blur-2xl border border-white/20 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.6)] z-50`}
+                              >
+                                <div className="flex items-center gap-2 px-1 border-r border-white/10">
+                                  {["👍", "❤️", "😂", "😮", "😢", "🔥", "🥿"].map(emoji => (
+                                    <button
+                                      key={emoji}
+                                      onClick={() => onReact(message._id, emoji)}
+                                      className="hover:scale-150 transition-transform duration-200 text-2xl px-1"
+                                    >
+                                      {emoji}
+                                    </button>
+                                  ))}
+                                </div>
+                                <div className="flex items-center gap-1.5 pr-1">
+                                  <button onClick={() => setReplyingTo(message)} title="Reply" className="p-2 hover:bg-white/10 rounded-xl transition-colors text-slate-100"><Reply size={18} /></button>
+                                  <button onClick={() => setForwardModalMessage(message)} title="Forward" className="p-2 hover:bg-white/10 rounded-xl transition-colors text-slate-100"><Forward size={18} /></button>
+                                  <button onClick={() => pinMessage(message._id)} title="Pin" className="p-2 hover:bg-white/10 rounded-xl transition-colors"><Pin size={18} className={message.isPinned ? "text-blue-400" : "text-slate-100"} /></button>
+                                  {isMe && (
+                                    <>
+                                      <button onClick={() => setEditingMessage(message)} title="Edit" className="p-2 hover:bg-white/10 rounded-xl transition-colors text-slate-100"><Edit2 size={18} /></button>
+                                      <button onClick={() => deleteMessage(message._id)} title="Delete" className="p-2 hover:bg-red-500/30 rounded-xl transition-colors text-red-400"><Trash2 size={18} /></button>
+                                    </>
                                   )}
                                 </div>
-                              )}
-                            </div>
-                          </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
 
-                          {/* Reactions display */}
-                          {message.reactions && message.reactions.length > 0 && (
-                            <div className={`absolute -bottom-3 ${isMe ? "left-0" : "right-0"} flex gap-1`}>
-                              {Array.from(new Set(message.reactions.map(r => r.emoji))).map(emoji => (
-                                <div key={emoji} className="bg-[#111b21] border border-white/5 rounded-full px-1.5 py-0.5 text-[10px] shadow-lg flex items-center gap-1">
-                                  {emoji} <span className="text-slate-500">{message.reactions.filter(r => r.emoji === emoji).length}</span>
+                          <div
+                            className={`flex flex-col p-0 rounded-2xl shadow-lg overflow-visible min-w-[100px] md:min-w-[120px] ${isMe
+                              ? "bg-gradient-to-br from-blue-600 to-blue-700 text-white"
+                              : "bg-[#202c33] text-[#e9edef]"
+                              } ${message.isPinned ? "ring-2 ring-blue-500/40" : ""} relative`}
+                          >
+                            {message.isPinned && (
+                              <div className="flex items-center gap-2 text-[10px] text-blue-200 px-5 py-2 bg-black/10 font-bold tracking-widest uppercase rounded-t-[28px]">
+                                <Pin size={11} /> Pinned
+                              </div>
+                            )}
+
+                            {message.replyTo && (
+                              <div className="bg-black/20 mx-4 mt-4 p-3 rounded-2xl border-l-[6px] border-blue-400 text-xs opacity-90 cursor-pointer hover:bg-black/30 transition-all">
+                                <p className="truncate italic font-medium opacity-60">"{messages.find(m => m._id === message.replyTo)?.text || "Original message"}"</p>
+                              </div>
+                            )}
+
+                            {message.image && (
+                              <div className="p-2 pb-0">
+                                <img src={message.image} alt='Attachment' className='max-h-[500px] w-full object-cover rounded-[22px] cursor-pointer hover:brightness-110 transition-all shadow-lg' />
+                              </div>
+                            )}
+
+                            <div className="px-3 py-1.5">
+                              {!isMe && selectedUser.isGroup && (
+                                <span className="text-[11px] font-black text-blue-400 tracking-wider uppercase opacity-90 block mb-0.5">{message.senderName || "User"}</span>
+                              )}
+                              <div className="flex items-end gap-2">
+                                <div className="flex-1 min-w-0">
+                                  {message.text && <span className="text-[14px] leading-[1.5] whitespace-pre-wrap font-sans">{message.text}</span>}
                                 </div>
-                              ))}
+                                <div className="flex items-center gap-1 shrink-0 pb-0.5">
+                                  {message.isEdited && <span className="text-[9px] opacity-40 italic">edited</span>}
+                                  <time className='text-[10px] opacity-50 font-medium tracking-tight'>{formatMessageTime(message.createdAt)}</time>
+                                  {isMe && (
+                                    message.seen ? (
+                                      <CheckCheck className='size-3.5 text-blue-300' />
+                                    ) : message.delivered ? (
+                                      <CheckCheck className='size-3.5 text-slate-400/60' />
+                                    ) : (
+                                      <Check className='size-3.5 text-slate-400/60' />
+                                    )
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          )}
+
+                            {/* Reactions display - Positioned relative to bubble bottom edge */}
+                            <AnimatePresence>
+                              {message.reactions && message.reactions.length > 0 && (
+                                <motion.div
+                                  initial={{ scale: 0.5, opacity: 0, y: 5 }}
+                                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                                  className={`absolute -bottom-3 ${isMe ? "left-6" : "right-6"} flex gap-1.5 z-20`}
+                                >
+                                  {Array.from(new Set(message.reactions.map(r => r.emoji))).map(emoji => (
+                                    <motion.div
+                                      whileHover={{ scale: 1.25, y: -2 }}
+                                      key={emoji}
+                                      className="bg-[#1a2329] border border-white/30 rounded-full px-3 py-1 text-[13px] shadow-[0_4px_15px_rgba(0,0,0,0.5)] flex items-center gap-2 text-white font-bold backdrop-blur-3xl"
+                                    >
+                                      <span>{emoji}</span>
+                                      <span className="text-[11px] text-blue-200">{message.reactions.filter(r => r.emoji === emoji).length}</span>
+                                    </motion.div>
+                                  ))}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
-            <div ref={messageEndRef} />
-          </>
+                    </motion.div>
+                  );
+                })}
+            </AnimatePresence>
+          </div>
         )}
       </div>
 
       {/* Message Input or Admin-only notice */}
-      {(() => {
-        if (!selectedUser.isGroup) return <MessageInput />;
+      <AnimatePresence mode="wait">
+        {(() => {
+          if (selectedUser.isGroup) {
+            const isAdmin = selectedUser.admins?.some(id =>
+              (typeof id === 'string' ? id : id._id) === authUser._id
+            );
 
-        const isAdmin = selectedUser.admins?.some(id =>
-          (typeof id === 'string' ? id : id._id) === authUser._id
-        );
-
-        if (selectedUser.settings?.sendMessages && !isAdmin) {
+            if (selectedUser.settings?.sendMessages && !isAdmin) {
+              return (
+                <motion.div
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: 20, opacity: 0 }}
+                  className="p-4 bg-[#1f2c33]/50 backdrop-blur-md border-t border-white/5 flex items-center justify-center gap-3 text-slate-400"
+                >
+                  <ShieldAlert size={18} className="text-amber-500/60" />
+                  <p className="text-sm font-medium italic">Only admins can send messages to this group</p>
+                </motion.div>
+              );
+            }
+          }
           return (
-            <div className="p-4 bg-[#202c33] border-t border-white/5 flex items-center justify-center gap-3 text-slate-500 animate-in slide-in-from-bottom-2">
-              <ShieldAlert size={18} className="text-amber-500/50" />
-              <p className="text-sm font-medium italic">Only admins can send messages to this group</p>
-            </div>
+            <motion.div
+              key="input"
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+            >
+              <MessageInput />
+            </motion.div>
           );
-        }
-
-        return <MessageInput />;
-      })()}
+        })()}
+      </AnimatePresence>
 
       {forwardModalMessage && (
         <ForwardModal
