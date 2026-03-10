@@ -58,7 +58,7 @@ export const signup = async (req, res) => {
 		await newUser.save();
 
 		const deviceInfo = req.headers["user-agent"] || "unknown";
-		const { accessToken } = await generateTokens(newUser._id, res, deviceInfo);
+		const { accessToken, refreshToken } = await generateTokens(newUser._id, res, deviceInfo);
 
 		res.status(201).json({
 			_id: newUser._id,
@@ -67,6 +67,7 @@ export const signup = async (req, res) => {
 			email: newUser.email,
 			profilePic: newUser.profilePic,
 			token: accessToken,
+			refreshToken,
 		});
 	} catch (error) {
 		console.error("Error in signup controller:", error);
@@ -81,7 +82,7 @@ export const login = (req, res, next) => {
 
 		try {
 			const deviceInfo = req.headers["user-agent"] || "unknown";
-			const { accessToken } = await generateTokens(user._id, res, deviceInfo);
+			const { accessToken, refreshToken } = await generateTokens(user._id, res, deviceInfo);
 
 			res.status(200).json({
 				_id: user._id,
@@ -90,6 +91,7 @@ export const login = (req, res, next) => {
 				email: user.email,
 				profilePic: user.profilePic,
 				token: accessToken,
+				refreshToken,
 			});
 		} catch (error) {
 			console.error("Error in login controller:", error);
@@ -100,7 +102,8 @@ export const login = (req, res, next) => {
 
 export const refreshToken = async (req, res) => {
 	try {
-		const token = req.cookies.refreshToken;
+		// Accept refresh token from cookie OR request body (fallback for blocked cookies)
+		const token = req.cookies.refreshToken || req.body.refreshToken;
 		if (!token) return res.status(401).json({ error: "Refresh Token required" });
 
 		const payload = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
@@ -117,9 +120,10 @@ export const refreshToken = async (req, res) => {
 		await RefreshToken.findByIdAndDelete(storedToken._id);
 
 		const deviceInfo = req.headers["user-agent"] || "unknown";
-		const { accessToken } = await generateTokens(payload.userId, res, deviceInfo);
+		const { accessToken, refreshToken: newRefreshToken } = await generateTokens(payload.userId, res, deviceInfo);
 
-		res.status(200).json({ token: accessToken });
+		// Return both tokens in body so frontend can store in localStorage when cookies are blocked
+		res.status(200).json({ token: accessToken, refreshToken: newRefreshToken });
 	} catch (error) {
 		console.error("Error in refreshToken controller:", error);
 		clearTokens(res);

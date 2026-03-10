@@ -45,15 +45,17 @@ apiClient.interceptors.response.use(
 			originalRequest._retry = true;
 
 			try {
-				// Call refresh endpoint directly using axios to avoiding interceptor loop
+				// Send refresh token from localStorage as fallback when cookies are blocked
+				const savedRefreshToken = localStorage.getItem("genchat-refresh-token");
 				const res = await axios.post(
 					`${apiClient.defaults.baseURL}/auth/refresh`,
-					{},
+					{ refreshToken: savedRefreshToken },
 					{ withCredentials: true }
 				);
 
-				const { token } = res.data;
+				const { token, refreshToken: newRefreshToken } = res.data;
 				localStorage.setItem("genchat-token", token);
+				if (newRefreshToken) localStorage.setItem("genchat-refresh-token", newRefreshToken);
 
 				// Update Authorization header and retry original request
 				originalRequest.headers.Authorization = `Bearer ${token}`;
@@ -63,6 +65,7 @@ apiClient.interceptors.response.use(
 
 				// Clear auth state
 				localStorage.removeItem("genchat-token");
+				localStorage.removeItem("genchat-refresh-token");
 				// Dynamically import useAuthStore to avoid circular dependencies
 				import("../store/useAuthStore.js").then(({ useAuthStore }) => {
 					useAuthStore.setState({ authUser: null });

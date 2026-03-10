@@ -28,6 +28,7 @@ export const useAuthStore = create((set, get) => ({
     try {
       const res = await apiClient.post("/auth/signup", data);
       localStorage.setItem("genchat-token", res.data.token);
+      if (res.data.refreshToken) localStorage.setItem("genchat-refresh-token", res.data.refreshToken);
       set({ authUser: res.data });
       toast.success("Account created successfully");
       // Fetch full user data in background
@@ -49,6 +50,7 @@ export const useAuthStore = create((set, get) => ({
     try {
       const res = await apiClient.post("/auth/login", data);
       localStorage.setItem("genchat-token", res.data.token);
+      if (res.data.refreshToken) localStorage.setItem("genchat-refresh-token", res.data.refreshToken);
       // Set initial user data so the app transitions to authenticated layout
       set({ authUser: res.data });
       toast.success("Logged in successfully");
@@ -70,6 +72,7 @@ export const useAuthStore = create((set, get) => ({
     try {
       await apiClient.post("/auth/logout");
       localStorage.removeItem("genchat-token");
+      localStorage.removeItem("genchat-refresh-token");
       set({ authUser: null });
       toast.success("Logged out successfully");
     } catch (error) {
