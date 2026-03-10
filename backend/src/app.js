@@ -72,7 +72,7 @@ const corsOptions = {
   origin: checkOrigin,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'cache-control', 'pragma'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'cache-control', 'pragma', 'x-genchat-requested-with'],
 };
 
 app.use(cors(corsOptions));

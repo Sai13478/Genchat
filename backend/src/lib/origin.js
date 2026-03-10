@@ -60,11 +60,16 @@ export const checkOrigin = (origin, callback) => {
         return callback(null, true);
     }
 
+    // Normalize: remove trailing slash for comparison
+    const normalizedOrigin = origin ? origin.replace(/\/$/, "") : origin;
+
     // Allow if:
     // 1. No origin (direct request)
     // 2. Local network origin
     // 3. Specifically allowed in .env
-    if (!origin || isLocalOrigin(origin) || frontendUrls.includes(origin)) {
+    const isAllowedByEnv = frontendUrls.some(url => url.replace(/\/$/, "") === normalizedOrigin);
+
+    if (!origin || isLocalOrigin(normalizedOrigin) || isAllowedByEnv) {
         callback(null, true);
     } else {
         // Log blocked origin for debugging
