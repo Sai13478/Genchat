@@ -10,20 +10,18 @@ const getTurnServers = () => {
     const turnCred = import.meta.env.VITE_TURN_CREDENTIAL;
 
     if (turnUrl && turnUser && turnCred) {
-        // Self-hosted coturn: support comma-separated URLs
         const urls = turnUrl.split(",").map(u => u.trim());
         console.log("Using self-hosted TURN server:", urls);
         return [{ urls, username: turnUser, credential: turnCred }];
     }
 
-    // Fallback: free Open Relay TURN server
     console.log("Using fallback free TURN server (openrelay.metered.ca)");
     return [{
         urls: [
-            "turn:openrelay.metered.ca:80",
-            "turn:openrelay.metered.ca:443",
+            "turns:openrelay.metered.ca:443?transport=tcp",
             "turn:openrelay.metered.ca:443?transport=tcp",
-            "turns:openrelay.metered.ca:443?transport=tcp"
+            "turn:openrelay.metered.ca:80",
+            "turn:openrelay.metered.ca:443"
         ],
         username: "01c144b6367be1a94d4692b8",
         credential: "VW74xDH75bNE64m1",
@@ -33,6 +31,8 @@ const getTurnServers = () => {
 const configuration = {
     bundlePolicy: "max-bundle",
     rtcpMuxPolicy: "require",
+    iceCandidatePoolSize: 10,
+    iceTransportPolicy: "all",
     iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
@@ -112,30 +112,40 @@ export const useCallStore = create((set, get) => ({
             }
         };
 
-        peerConnection.oniceconnectionstatechange = async () => {
+        let iceRestartTimeout;
+        peerConnection.oniceconnectionstatechange = () => {
             if (peerConnection) {
                 const state = peerConnection.iceConnectionState;
                 console.log("ICE Connection state:", state);
 
-                if (state === "failed") {
-                    console.log("Restarting ICE...");
-                    try {
-                        const offer = await peerConnection.createOffer({ iceRestart: true });
-                        await peerConnection.setLocalDescription(offer);
+                if (state === "disconnected" || state === "failed") {
+                    console.warn(`ICE connection is ${state}. Starting 5s timeout for restart...`);
+                    clearTimeout(iceRestartTimeout);
+                    iceRestartTimeout = setTimeout(async () => {
+                        const currentState = peerConnection?.iceConnectionState;
+                        if (currentState === "disconnected" || currentState === "failed") {
+                            console.log("Timeout reached. Restarting ICE...");
+                            try {
+                                const offer = await peerConnection.createOffer({ iceRestart: true });
+                                await peerConnection.setLocalDescription(offer);
 
-                        const { callee, caller, callId, socket } = get();
-                        const otherUser = callee || caller;
+                                const { callee, caller, callId, socket } = get();
+                                const otherUser = callee || caller;
 
-                        if (otherUser && socket) {
-                            socket.emit("renegotiate-call", {
-                                to: otherUser._id,
-                                offer,
-                                callId
-                            });
+                                if (otherUser && socket) {
+                                    socket.emit("renegotiate-call", {
+                                        to: otherUser._id,
+                                        offer,
+                                        callId
+                                    });
+                                }
+                            } catch (e) {
+                                console.error("ICE restart failed", e);
+                            }
                         }
-                    } catch (e) {
-                        console.error("ICE restart failed", e);
-                    }
+                    }, 5000);
+                } else if (state === "connected" || state === "completed") {
+                    clearTimeout(iceRestartTimeout);
                 }
             }
         };
