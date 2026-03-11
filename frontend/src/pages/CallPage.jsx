@@ -34,6 +34,7 @@ const CallPage = () => {
     const navigate = useNavigate();
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
+    const remoteAudioRef = useRef(null);
     const [duration, setDuration] = useState("00:00");
     const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -64,7 +65,10 @@ const CallPage = () => {
         if (remoteVideoRef.current && remoteStream) {
             remoteVideoRef.current.srcObject = remoteStream;
         }
-    }, [remoteStream]);
+        if (remoteAudioRef.current && remoteStream) {
+            remoteAudioRef.current.srcObject = remoteStream;
+        }
+    }, [remoteStream, callType]);
 
     // Handle call end
     useEffect(() => {
@@ -193,6 +197,8 @@ const CallPage = () => {
                     {isFullscreen ? <Minimize2 size={24} /> : <Maximize2 size={24} />}
                 </button>
             </div>
+
+            <audio ref={remoteAudioRef} autoPlay playsInline className='hidden' />
 
             <style jsx>{`
                 @keyframes pulse-subtle {
