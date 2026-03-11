@@ -1,46 +1,31 @@
 import { create } from "zustand";
 import toast from "react-hot-toast";
+import AgoraRTC from "agora-rtc-sdk-ng";
+import apiClient from "../lib/apiClient";
 
-let peerConnection;
+const AGORA_APP_ID = import.meta.env.VITE_AGORA_APP_ID;
 
-// Build TURN server config from environment variables (self-hosted) or fallback to free relay
-const getTurnServers = () => {
-    const turnUrl = import.meta.env.VITE_TURN_URL;
-    const turnUser = import.meta.env.VITE_TURN_USER;
-    const turnCred = import.meta.env.VITE_TURN_CREDENTIAL;
+// Agora client instance (singleton)
+let agoraClient = null;
+let localAudioTrack = null;
+let localVideoTrack = null;
 
-    if (turnUrl && turnUser && turnCred) {
-        const urls = turnUrl.split(",").map(u => u.trim());
-        console.log("Using self-hosted TURN server:", urls);
-        return [{ urls, username: turnUser, credential: turnCred }];
+const getAgoraClient = () => {
+    if (!agoraClient) {
+        agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
     }
-
-    console.log("Using fallback free TURN server (openrelay.metered.ca)");
-    return [{
-        urls: [
-            "turns:openrelay.metered.ca:443?transport=tcp",
-            "turn:openrelay.metered.ca:443?transport=tcp",
-            "turn:openrelay.metered.ca:80",
-            "turn:openrelay.metered.ca:443"
-        ],
-        username: "01c144b6367be1a94d4692b8",
-        credential: "VW74xDH75bNE64m1",
-    }];
+    return agoraClient;
 };
 
-const configuration = {
-    bundlePolicy: "max-bundle",
-    rtcpMuxPolicy: "require",
-    iceCandidatePoolSize: 10,
-    iceTransportPolicy: "all",
-    iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:stun3.l.google.com:19302" },
-        { urls: "stun:stun4.l.google.com:19302" },
-        ...getTurnServers(),
-    ],
+// Fetch a temporary token from our backend
+const fetchAgoraToken = async (channelName) => {
+    try {
+        const res = await apiClient.get(`/agora/token?channelName=${channelName}`);
+        return res.data;
+    } catch (error) {
+        console.error("Failed to fetch Agora token:", error);
+        return null;
+    }
 };
 
 export const useCallStore = create((set, get) => ({
@@ -48,157 +33,8 @@ export const useCallStore = create((set, get) => ({
     selectedOutputDeviceId: "default",
     socket: null,
     connectionStatus: "idle", // 'idle', 'connecting', 'connected', 'failed', 'disconnected'
-    iceStatus: "none", // 'none', 'gathering', 'complete'
-    signalingState: "stable",
 
     setSocket: (socket) => set({ socket }),
-
-    _processIceCandidateQueue: async () => {
-        const { iceCandidateQueue } = get();
-        if (!peerConnection || !peerConnection.remoteDescription) return;
-
-        console.log(`Processing ${iceCandidateQueue.length} queued ICE candidates.`);
-        for (const candidate of iceCandidateQueue) {
-            try {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-            } catch (error) {
-                console.error("Error adding queued ICE candidate:", error);
-            }
-        }
-        set({ iceCandidateQueue: [] });
-    },
-
-    _createPeerConnection: () => {
-        const { socket } = get();
-        if (!socket) {
-            console.error("Cannot create peer connection: socket not found.");
-            return;
-        }
-
-        if (peerConnection && peerConnection.signalingState !== "closed") {
-            console.log("Using existing peer connection.");
-            return;
-        }
-
-        peerConnection = new RTCPeerConnection(configuration);
-        console.log("Created new peer connection.");
-        set({ iceCandidateQueue: [] }); // Reset queue for new connection
-
-        // ... existing state change logs ...
-        peerConnection.onsignalingstatechange = () => {
-            if (peerConnection) {
-                console.log(`Signaling state change: ${peerConnection.signalingState}`);
-                set({ signalingState: peerConnection.signalingState });
-            }
-        };
-
-        peerConnection.onconnectionstatechange = () => {
-            if (peerConnection) {
-                const state = peerConnection.connectionState;
-                console.log(`Connection state: ${state}`);
-                set({ connectionStatus: state });
-
-                if (state === "failed") {
-                    console.error("WebRTC Connection failed. Check network/firewall.");
-                    toast.error("Connection failed. Please check your internet or firewall.");
-                }
-            }
-        };
-
-        peerConnection.onicegatheringstatechange = () => {
-            if (peerConnection) {
-                console.log(`ICE Gathering state: ${peerConnection.iceGatheringState}`);
-                set({ iceStatus: peerConnection.iceGatheringState });
-            }
-        };
-
-        let iceRestartTimeout;
-        peerConnection.oniceconnectionstatechange = () => {
-            if (peerConnection) {
-                const state = peerConnection.iceConnectionState;
-                console.log("ICE Connection state:", state);
-
-                if (state === "disconnected" || state === "failed") {
-                    console.warn(`ICE connection is ${state}. Starting 5s timeout for restart...`);
-                    clearTimeout(iceRestartTimeout);
-                    iceRestartTimeout = setTimeout(async () => {
-                        const currentState = peerConnection?.iceConnectionState;
-                        if (currentState === "disconnected" || currentState === "failed") {
-                            console.log("Timeout reached. Restarting ICE...");
-                            try {
-                                const offer = await peerConnection.createOffer({ iceRestart: true });
-                                await peerConnection.setLocalDescription(offer);
-
-                                const { callee, caller, callId, socket } = get();
-                                const otherUser = callee || caller;
-
-                                if (otherUser && socket) {
-                                    socket.emit("renegotiate-call", {
-                                        to: otherUser._id,
-                                        offer,
-                                        callId
-                                    });
-                                }
-                            } catch (e) {
-                                console.error("ICE restart failed", e);
-                            }
-                        }
-                    }, 5000);
-                } else if (state === "connected" || state === "completed") {
-                    clearTimeout(iceRestartTimeout);
-                }
-            }
-        };
-
-        peerConnection.onnegotiationneeded = null; // Explicitly disabled as per requirement
-
-        peerConnection.ontrack = (event) => {
-            console.log(`Received remote track: ${event.track.kind}`);
-
-            if (event.streams && event.streams[0]) {
-                const remoteStream = event.streams[0];
-                console.log(`Using stream from event. Tracks: ${remoteStream.getTracks().length}`);
-                // Create a new MediaStream reference to force Zustand re-render
-                set({ remoteStream: new MediaStream(remoteStream.getTracks()) });
-            } else {
-                set((state) => {
-                    const currentStream = state.remoteStream || new MediaStream();
-                    if (!currentStream.getTracks().find(t => t.id === event.track.id)) {
-                        currentStream.addTrack(event.track);
-                        console.log(`Track ${event.track.id} (${event.track.kind}) added to manual remote stream.`);
-                    }
-                    // Re-create stream to force state update
-                    return { remoteStream: new MediaStream(currentStream.getTracks()) };
-                });
-            }
-
-            // When the track unmutes (starts receiving actual frames), force a stream
-            // update so the video element re-renders with the now-active track
-            event.track.onunmute = () => {
-                console.log(`Track ${event.track.kind} unmuted — forcing stream refresh`);
-                const currentRemote = get().remoteStream;
-                if (currentRemote) {
-                    set({ remoteStream: new MediaStream(currentRemote.getTracks()) });
-                }
-            };
-        };
-
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                console.log("ICE →", event.candidate.type, event.candidate.protocol);
-
-                const { callee, caller, callId } = get();
-                const otherUser = callee || caller;
-                if (otherUser) {
-                    socket.emit("ice-candidate", {
-                        to: otherUser._id,
-                        candidate: event.candidate,
-                        callId
-                    });
-                }
-            }
-        };
-    },
 
     setIncomingCallData: (callDetails) =>
         set({
@@ -209,69 +45,83 @@ export const useCallStore = create((set, get) => ({
             callId: callDetails.callId,
         }),
 
-    initiateCall: async (callee, callType, stream = null) => {
+    // ──────────────────────────────────────────────────────────────
+    //  CALLER: Initiate a call
+    // ──────────────────────────────────────────────────────────────
+    initiateCall: async (callee, callType) => {
         set({ callState: "calling", callee, callType, isVideoEnabled: callType === "video" });
         const { socket } = get();
-        const localStream = stream || get().localStream;
 
-        get()._createPeerConnection();
+        // Create local tracks FIRST so UI can show preview
+        try {
+            if (callType === "video") {
+                [localAudioTrack, localVideoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks(
+                    {},
+                    { encoderConfig: "720p_2" }
+                );
+            } else {
+                localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+                localVideoTrack = null;
+            }
 
-        if (localStream && peerConnection) {
-            console.log(`Adding ${localStream.getTracks().length} tracks to peer connection (Caller).`);
-            localStream.getTracks().forEach((track) => {
-                peerConnection.addTrack(track, localStream);
-            });
+            // Build a MediaStream for the local preview
+            const previewStream = new MediaStream();
+            if (localAudioTrack) previewStream.addTrack(localAudioTrack.getMediaStreamTrack());
+            if (localVideoTrack) previewStream.addTrack(localVideoTrack.getMediaStreamTrack());
+            set({ localStream: previewStream });
+
+        } catch (err) {
+            console.error("Failed to get local media:", err);
+            toast.error("Could not access camera/microphone. Please check permissions.");
+            get().resetCallState();
+            return;
         }
 
-        try {
-            if (!peerConnection || peerConnection.signalingState === "closed") return;
-
-            console.log("Explicitly creating offer...");
-            const offer = await peerConnection.createOffer();
-            if (peerConnection.signalingState === "closed") return;
-            await peerConnection.setLocalDescription(offer);
-
-            if (socket) {
-                socket.emit("call-user", {
-                    to: callee._id,
-                    offer: offer,
-                    callType: callType,
-                });
-            }
-        } catch (err) {
-            console.error("Error creating initial offer:", err);
-            toast.error("Failed to initialize call.");
-            get().hangup();
+        // Ask the signaling server to ring the callee
+        if (socket) {
+            socket.emit("call-user", {
+                to: callee._id,
+                offer: {}, // No SDP needed — Agora handles media
+                callType,
+            });
         }
     },
 
+    // ──────────────────────────────────────────────────────────────
+    //  CALLEE: Answer incoming call
+    // ──────────────────────────────────────────────────────────────
     answerCall: async () => {
         const { incomingCallData } = get();
         if (!incomingCallData) return;
 
-        const { callType } = incomingCallData;
+        const { callType, callId } = incomingCallData;
 
         try {
-            // EXTREME RELAXATION: Just use "true" to ensure any camera works
-            const constraints = {
-                video: callType === "video",
-                audio: true,
-            };
+            // Create local tracks
+            if (callType === "video") {
+                [localAudioTrack, localVideoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks(
+                    {},
+                    { encoderConfig: "720p_2" }
+                );
+            } else {
+                localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+                localVideoTrack = null;
+            }
 
-            console.log("Answering call. Requesting media with:", constraints);
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
-            // Safety check: Did we cancel/hangup while waiting for camera?
+            // Safety check: Did we cancel while waiting for camera?
             if (get().callState === "idle") {
                 console.log("Call aborted while waiting for media.");
-                stream.getTracks().forEach(t => t.stop());
+                localAudioTrack?.close();
+                localVideoTrack?.close();
                 return;
             }
 
-            console.log("Successfully obtained local stream.");
+            const previewStream = new MediaStream();
+            if (localAudioTrack) previewStream.addTrack(localAudioTrack.getMediaStreamTrack());
+            if (localVideoTrack) previewStream.addTrack(localVideoTrack.getMediaStreamTrack());
 
             set({
-                localStream: stream,
+                localStream: previewStream,
                 isVideoEnabled: callType === "video",
                 incomingCallData: null,
                 callState: "connected",
@@ -279,27 +129,18 @@ export const useCallStore = create((set, get) => ({
                 callStartTime: Date.now(),
             });
 
-            get()._createPeerConnection();
+            // Join the Agora channel using the callId as the channel name
+            const channelName = callId || `call-${Date.now()}`;
+            await get()._joinAgoraChannel(channelName);
 
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingCallData.offer));
-
-            // Process queued candidates now that remoteDescription is set
-            await get()._processIceCandidateQueue();
-
-            if (stream) {
-                console.log(`Adding ${stream.getTracks().length} tracks to peer connection.`);
-                stream.getTracks().forEach((track) => {
-                    peerConnection.addTrack(track, stream);
-                    console.log(`Added ${track.kind} track.`);
-                });
-            }
-
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-
+            // Notify the caller that we accepted
             const { socket } = get();
             if (socket) {
-                socket.emit("answer-call", { to: incomingCallData.from._id, answer, callId: incomingCallData.callId });
+                socket.emit("answer-call", {
+                    to: incomingCallData.from._id,
+                    answer: { channelName }, // Send channel name instead of SDP
+                    callId: incomingCallData.callId,
+                });
             }
         } catch (error) {
             console.error("Error answering call:", error);
@@ -308,58 +149,121 @@ export const useCallStore = create((set, get) => ({
         }
     },
 
+    // ──────────────────────────────────────────────────────────────
+    //  CALLER: Handle call accepted — join Agora channel
+    // ──────────────────────────────────────────────────────────────
     handleCallAccepted: async (answer, callId) => {
-        if (!peerConnection) return;
         try {
-            console.log(`Call accepted. Syncing Call ID: ${callId}`);
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            console.log(`Call accepted. Joining Agora channel for Call ID: ${callId}`);
+            const channelName = answer?.channelName || callId;
             set({ callState: "connected", callAccepted: true, callStartTime: Date.now(), callId });
-
-            // Process queued candidates
-            await get()._processIceCandidateQueue();
+            await get()._joinAgoraChannel(channelName);
         } catch (error) {
-            console.error("Error setting remote description:", error);
+            console.error("Error joining Agora channel:", error);
+            toast.error("Failed to connect to call.");
+            get().hangup();
         }
     },
 
-    handleRenegotiation: async (offer) => {
-        const { socket } = get();
-        if (!peerConnection || !socket) return;
-        try {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-            await get()._processIceCandidateQueue();
+    // ──────────────────────────────────────────────────────────────
+    //  INTERNAL: Join Agora channel, publish tracks, subscribe to remote
+    // ──────────────────────────────────────────────────────────────
+    _joinAgoraChannel: async (channelName) => {
+        const client = getAgoraClient();
+        set({ connectionStatus: "connecting" });
 
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            const { callee, caller, callId } = get();
-            const otherUser = callee || caller;
-            if (otherUser) {
-                socket.emit("answer-call", { to: otherUser._id, answer, callId });
+        // Fetch token from backend
+        const tokenData = await fetchAgoraToken(channelName);
+        const token = tokenData?.token || null;
+
+        console.log(`Joining Agora channel: ${channelName}`);
+
+        // Subscribe to remote user events BEFORE joining
+        client.on("user-published", async (user, mediaType) => {
+            await client.subscribe(user, mediaType);
+            console.log(`Subscribed to remote user ${user.uid}, mediaType: ${mediaType}`);
+
+            if (mediaType === "video") {
+                const remoteVideoTrack = user.videoTrack;
+                if (remoteVideoTrack) {
+                    const remoteStream = new MediaStream([remoteVideoTrack.getMediaStreamTrack()]);
+                    // Also add audio if available
+                    const currentRemote = get().remoteStream;
+                    if (currentRemote) {
+                        currentRemote.getAudioTracks().forEach(t => remoteStream.addTrack(t));
+                    }
+                    set({ remoteStream: remoteStream });
+                }
             }
-        } catch (error) {
-            console.error("Error during renegotiation response:", error);
-        }
-    },
+            if (mediaType === "audio") {
+                const remoteAudioTrack = user.audioTrack;
+                if (remoteAudioTrack) {
+                    remoteAudioTrack.play(); // Play audio automatically
+                    const currentRemote = get().remoteStream;
+                    if (currentRemote) {
+                        const newStream = new MediaStream(currentRemote.getTracks());
+                        newStream.addTrack(remoteAudioTrack.getMediaStreamTrack());
+                        set({ remoteStream: newStream });
+                    } else {
+                        set({ remoteStream: new MediaStream([remoteAudioTrack.getMediaStreamTrack()]) });
+                    }
+                }
+            }
+        });
 
-    handleNewIceCandidate: async (candidate) => {
-        if (!peerConnection || !peerConnection.remoteDescription) {
-            set((state) => ({ iceCandidateQueue: [...state.iceCandidateQueue, candidate] }));
-            return;
-        }
+        client.on("user-unpublished", (user, mediaType) => {
+            console.log(`Remote user ${user.uid} unpublished ${mediaType}`);
+        });
+
+        client.on("user-left", () => {
+            console.log("Remote user left the channel.");
+        });
+
+        client.on("connection-state-change", (curState) => {
+            console.log(`Agora connection state: ${curState}`);
+            if (curState === "CONNECTED") {
+                set({ connectionStatus: "connected" });
+            } else if (curState === "DISCONNECTED") {
+                set({ connectionStatus: "disconnected" });
+            } else if (curState === "RECONNECTING") {
+                set({ connectionStatus: "connecting" });
+            }
+        });
+
         try {
-            await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            // Join channel — uid 0 means Agora assigns a dynamic UID
+            await client.join(AGORA_APP_ID, channelName, token, 0);
+            console.log("Successfully joined Agora channel.");
+
+            // Publish local tracks
+            const tracksToPublish = [localAudioTrack, localVideoTrack].filter(Boolean);
+            if (tracksToPublish.length > 0) {
+                await client.publish(tracksToPublish);
+                console.log(`Published ${tracksToPublish.length} local tracks.`);
+            }
+
+            set({ connectionStatus: "connected" });
         } catch (error) {
-            console.error("Error adding received ICE candidate", error);
+            console.error("Failed to join Agora channel:", error);
+            set({ connectionStatus: "failed" });
+            toast.error("Failed to connect to call. Please try again.");
         }
     },
 
+    // ──────────────────────────────────────────────────────────────
+    //  ICE candidate handling — NOT NEEDED with Agora (noop)
+    // ──────────────────────────────────────────────────────────────
+    handleNewIceCandidate: async () => { /* No-op: Agora handles connectivity */ },
+    handleRenegotiation: async () => { /* No-op: Agora handles renegotiation */ },
 
+    // ──────────────────────────────────────────────────────────────
+    //  Decline / Hangup / Reset
+    // ──────────────────────────────────────────────────────────────
     declineCall: () => {
         const { incomingCallData, socket } = get();
         if (incomingCallData && socket) {
             socket.emit("decline-call", { to: incomingCallData.from._id, callId: incomingCallData.callId });
         }
-        // Use hangup for cleanup, but don't emit a hangup event since it's a decline
         get().hangup(false);
     },
 
@@ -373,13 +277,22 @@ export const useCallStore = create((set, get) => ({
             }
         }
 
-        // Centralized cleanup logic
-        if (peerConnection) {
-            peerConnection.close();
-            peerConnection = null;
-            console.log("Peer connection closed and cleaned up.");
+        // Leave Agora channel and close local tracks
+        if (agoraClient) {
+            agoraClient.leave().catch(e => console.warn("Agora leave error:", e));
+            agoraClient.removeAllListeners();
+            agoraClient = null;
+        }
+        if (localAudioTrack) {
+            localAudioTrack.close();
+            localAudioTrack = null;
+        }
+        if (localVideoTrack) {
+            localVideoTrack.close();
+            localVideoTrack = null;
         }
 
+        console.log("Agora call cleaned up.");
         get().resetCallState();
     },
 
@@ -387,8 +300,6 @@ export const useCallStore = create((set, get) => ({
         const { localStream, remoteStream } = get();
         if (localStream) localStream.getTracks().forEach((track) => track.stop());
         if (remoteStream) remoteStream.getTracks().forEach((track) => track.stop());
-
-        // makingOffer removed
 
         set({
             incomingCallData: null,
@@ -405,93 +316,79 @@ export const useCallStore = create((set, get) => ({
             isMuted: false,
             isVideoEnabled: false,
             iceCandidateQueue: [],
+            connectionStatus: "idle",
         });
     },
 
     setLocalStream: (stream) => set({ localStream: stream }),
     setRemoteStream: (stream) => set({ remoteStream: stream }),
     setCallId: (callId) => set({ callId }),
-    toggleMute: () => {
-        const { localStream, isMuted } = get();
-        if (localStream) {
-            const newMutedState = !isMuted;
-            localStream.getAudioTracks().forEach((track) => {
-                track.enabled = !newMutedState;
-            });
-            set({ isMuted: newMutedState });
-        }
-    },
-    toggleVideo: () => {
-        const { localStream, isVideoEnabled } = get();
-        if (localStream) {
-            const newVideoState = !isVideoEnabled;
-            localStream.getVideoTracks().forEach((track) => {
-                track.enabled = newVideoState;
-            });
-            set({ isVideoEnabled: newVideoState });
-        }
-    },
-    toggleScreenShare: async () => {
-        const { isScreenSharing, localStream, callType } = get();
 
-        if (callType !== "video" || !peerConnection) {
-            console.warn("Screen sharing is only available for video calls and when a peer connection is active.");
+    toggleMute: () => {
+        const { isMuted } = get();
+        const newMutedState = !isMuted;
+        if (localAudioTrack) {
+            localAudioTrack.setEnabled(!newMutedState);
+        }
+        set({ isMuted: newMutedState });
+    },
+
+    toggleVideo: () => {
+        const { isVideoEnabled } = get();
+        const newVideoState = !isVideoEnabled;
+        if (localVideoTrack) {
+            localVideoTrack.setEnabled(newVideoState);
+        }
+        set({ isVideoEnabled: newVideoState });
+    },
+
+    toggleScreenShare: async () => {
+        const { isScreenSharing, callType } = get();
+        const client = getAgoraClient();
+
+        if (callType !== "video" || !client) {
+            console.warn("Screen sharing is only available for video calls.");
             return;
         }
 
         if (isScreenSharing) {
-            // --- STOP SCREEN SHARING & REVERT TO CAMERA ---
+            // Stop screen sharing — switch back to camera
             try {
-                // Request basic quality when switching back to the camera for compatibility
-                const videoConstraints = {
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                };
+                const newCameraTrack = await AgoraRTC.createCameraVideoTrack({ encoderConfig: "720p_2" });
+                await client.unpublish(localVideoTrack);
+                localVideoTrack?.close();
+                localVideoTrack = newCameraTrack;
+                await client.publish(localVideoTrack);
 
-                const cameraStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
-                const cameraTrack = cameraStream.getVideoTracks()[0];
-
-                const sender = peerConnection.getSenders().find((s) => s.track?.kind === "video");
-                if (sender) {
-                    await sender.replaceTrack(cameraTrack);
-                }
-
-                // Stop the old screen sharing track
-                localStream.getVideoTracks().forEach((track) => track.stop());
-
-                // Update local stream with camera video and existing audio
-                const newStream = new MediaStream([cameraTrack, ...localStream.getAudioTracks()]);
-                set({ localStream: newStream, isScreenSharing: false });
-
-                // Formal renegotiation for screen share stop
-                await get()._renegotiate();
+                // Update local preview
+                const previewStream = new MediaStream();
+                if (localAudioTrack) previewStream.addTrack(localAudioTrack.getMediaStreamTrack());
+                previewStream.addTrack(localVideoTrack.getMediaStreamTrack());
+                set({ localStream: previewStream, isScreenSharing: false });
             } catch (error) {
-                console.error("Error switching back to camera:", error);
-                toast.error("Could not switch back to camera. Please check permissions.");
+                console.error("Error reverting to camera:", error);
+                toast.error("Could not switch back to camera.");
             }
         } else {
-            // --- START SCREEN SHARING ---
+            // Start screen sharing
             try {
-                const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-                const screenTrack = screenStream.getVideoTracks()[0];
+                const screenTrack = await AgoraRTC.createScreenVideoTrack({}, "disable");
+                await client.unpublish(localVideoTrack);
+                localVideoTrack?.close();
 
-                const sender = peerConnection.getSenders().find((s) => s.track?.kind === "video");
-                if (sender) {
-                    await sender.replaceTrack(screenTrack);
-                }
+                // screenTrack can be a single track or [videoTrack, audioTrack]
+                const videoTrack = Array.isArray(screenTrack) ? screenTrack[0] : screenTrack;
+                localVideoTrack = videoTrack;
+                await client.publish(localVideoTrack);
 
-                screenTrack.onended = () => {
+                localVideoTrack.on("track-ended", () => {
                     if (get().isScreenSharing) get().toggleScreenShare();
-                };
+                });
 
-                localStream.getVideoTracks().forEach((track) => track.stop());
-
-                // Update local stream with screen track and existing audio
-                const newStream = new MediaStream([screenTrack, ...localStream.getAudioTracks()]);
-                set({ localStream: newStream, isScreenSharing: true });
-
-                // Formal renegotiation for screen share start
-                await get()._renegotiate();
+                const previewStream = new MediaStream();
+                if (localAudioTrack) previewStream.addTrack(localAudioTrack.getMediaStreamTrack());
+                previewStream.addTrack(localVideoTrack.getMediaStreamTrack());
+                set({ localStream: previewStream, isScreenSharing: true });
             } catch (error) {
                 console.error("Error starting screen share:", error);
                 if (error.name !== "NotAllowedError" && error.name !== "NotFoundError") {
@@ -500,6 +397,7 @@ export const useCallStore = create((set, get) => ({
             }
         }
     },
+
     setCallFailed: (reason = "Call Failed") => {
         set({ callState: "failed" });
         setTimeout(() => {
@@ -529,36 +427,5 @@ export const useCallStore = create((set, get) => ({
 
     setAudioOutput: async (deviceId) => {
         set({ selectedOutputDeviceId: deviceId });
-    },
-
-    // New helper for formal renegotiation
-    _renegotiate: async () => {
-        const { socket } = get();
-        if (!peerConnection || !socket) return;
-
-        // Safety: Only renegotiate if state is stable
-        if (peerConnection.signalingState !== "stable") {
-            console.log("Renegotiation skipped: Signaling state is not stable.");
-            return;
-        }
-
-        try {
-            console.log("Starting formal renegotiation...");
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-
-            const { callee, caller, callId } = get();
-            const otherUser = callee || caller;
-            if (otherUser) {
-                console.log(`Emitting renegotiation offer to ${otherUser._id}`);
-                socket.emit("renegotiate-call", {
-                    to: otherUser._id,
-                    offer: offer,
-                    callId
-                });
-            }
-        } catch (err) {
-            console.error("Renegotiation failed:", err);
-        }
     },
 }));

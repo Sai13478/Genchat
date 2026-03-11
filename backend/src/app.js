@@ -14,6 +14,7 @@ import messageRoutes from "./routes/message.route.js";
 import groupRoutes from "./routes/group.route.js";
 import callLogRoutes from "./routes/call.route.js";
 import conversationRoutes from "./routes/conversation.route.js";
+import agoraRoutes from "./routes/agora.route.js";
 
 dotenv.config();
 
@@ -87,6 +88,7 @@ app.use("/api/groups", groupRoutes);
 app.use("/api/v1/users/call-logs", callLogRoutes);
 app.use("/api/passkeys", passkeyRoutes);
 app.use("/api/conversations", conversationRoutes);
+app.use("/api/agora", agoraRoutes);
 
 const __dirname = path.resolve();
 

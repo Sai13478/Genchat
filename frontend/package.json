@@ -13,6 +13,7 @@
   "dependencies": {
     "@mui/icons-material": "^7.0.2",
     "@simplewebauthn/browser": "^13.1.2",
+    "agora-rtc-sdk-ng": "^4.24.2",
     "axios": "^1.11.0",
     "framer-motion": "^12.35.2",
     "lucide-react": "^0.459.0",

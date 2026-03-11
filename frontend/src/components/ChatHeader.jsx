@@ -10,7 +10,7 @@ import GroupProfileModal from "./GroupProfileModal";
 const ChatHeader = () => {
     const { selectedUser, typingUsers, setSelectedUser, messages } = useChatStore();
     const { onlineUsers } = useSocket();
-    const { initiateCall, setLocalStream } = useCallStore();
+    const { initiateCall } = useCallStore();
     const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
     const navigate = useNavigate();
 
@@ -21,18 +21,7 @@ const ChatHeader = () => {
 
     const handleCall = async (callType) => {
         try {
-            const videoConstraints = callType === "video" ? {
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-            } : false;
-
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: videoConstraints,
-                audio: true,
-            });
-            setLocalStream(stream);
-
-            initiateCall(selectedUser, callType, stream);
+            await initiateCall(selectedUser, callType);
             navigate("/call");
         } catch (error) {
             toast.error("Could not start call. Please allow camera and microphone access.");

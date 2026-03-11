@@ -48,7 +48,7 @@ function App() {
         handleRenegotiation,
         handleCallAnsweredElsewhere,
         handleCallDeclinedElsewhere,
-        setCallId
+        setCallId,
     } = useCallStore();
 
     // Effect for checking authentication status on initial load
